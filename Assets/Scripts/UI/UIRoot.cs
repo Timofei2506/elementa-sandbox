@@ -75,11 +75,11 @@ namespace Elementa
             UIFactory.SetAnchors((RectTransform)sub.transform, new Vector2(0f, 0f), new Vector2(0f, 1f), new Vector2(150f, 0f), new Vector2(420f, 0f));
             _desktopOnly.Add(sub.gameObject);
 
-            FpsText = UIFactory.Label(bar, "60 FPS", Theme.FontSmall, Theme.TextDim, TextAnchor.MiddleRight);
-            UIFactory.SetAnchors((RectTransform)FpsText.transform, new Vector2(1f, 0f), new Vector2(1f, 1f), new Vector2(-460f, 0f), new Vector2(-16f, 0f));
+            FpsText = UIFactory.Label(bar, "60 FPS", Theme.FontTiny, Theme.TextDim, TextAnchor.MiddleRight);
+            UIFactory.SetAnchors((RectTransform)FpsText.transform, new Vector2(1f, 0f), new Vector2(1f, 1f), new Vector2(-330f, 0f), new Vector2(-250f, 0f));
 
-            StatusText = UIFactory.Label(bar, "", Theme.FontSmall, Theme.TextDim, TextAnchor.MiddleRight);
-            UIFactory.SetAnchors((RectTransform)StatusText.transform, new Vector2(1f, 0f), new Vector2(1f, 1f), new Vector2(-360f, 0f), new Vector2(-80f, 0f));
+            StatusText = UIFactory.Label(bar, "", Theme.FontTiny, Theme.TextDim, TextAnchor.MiddleRight);
+            UIFactory.SetAnchors((RectTransform)StatusText.transform, new Vector2(1f, 0f), new Vector2(1f, 1f), new Vector2(-250f, 0f), new Vector2(-10f, 0f));
 
             float x = 260f;
             AddTopButton(bar, "Пауза", ref x, () => TogglePause());
