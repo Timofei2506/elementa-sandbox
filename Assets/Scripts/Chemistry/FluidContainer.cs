@@ -195,6 +195,32 @@ namespace Elementa
                     var gas = Game.I.Substances.TryGet(eff.gas);
                     if (gas != null) EffectsSystem.SpawnSmoke(transform.position + Vector3.up * 0.6f, 0.8f, 1.4f, 0.6f);
                 }
+
+                // gas pressure: the container hops and fizzes, and toxic clouds hurt NPCs
+                float gasVolume = Mix.GasVolumeLiters();
+                if (gasVolume > 0.35f)
+                {
+                    var rb = GetComponent<Rigidbody>();
+                    if (rb != null && gasVolume > 1f)
+                        rb.AddForce(Vector3.up * Mathf.Clamp(gasVolume * 0.35f, 0.4f, 6f), ForceMode.Impulse);
+                    var toxic = Mix.Toxicity;
+                    if (toxic > 0.35f)
+                    {
+                        foreach (var npc in Game.I.World.Npcs)
+                        {
+                            if (npc == null) continue;
+                            if (Vector3.Distance(npc.transform.position, transform.position) < 4.5f)
+                                npc.ApplyDamage(toxic * 9f * dt, transform.position);
+                        }
+                    }
+                    if (gasVolume > 2.5f)
+                    {
+                        // pressure blows the vessel apart
+                        Game.I.UI?.Log("Давление разорвало ёмкость!");
+                        BreakOpen();
+                        return;
+                    }
+                }
                 RefreshVisual();
             }
             HasSpark = found.Exists(r => r.effects.unstable);

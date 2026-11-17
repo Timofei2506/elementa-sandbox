@@ -239,6 +239,30 @@ namespace Elementa.Tests
             Check("все материалы имеют положительную прочность", mats.All.All(m => m.strength > 0));
             Check("все материалы имеют теплоёмкость", mats.All.All(m => m.heat > 0));
 
+            Console.WriteLine("\n[газ и давление]");
+            var gasMix = new Mixture(subs, 0.01f) { Temperature = 300f };
+            gasMix.AddMoles("co2", 0.2f);
+            Check("газ даёт объём", gasMix.GasVolumeLiters() > 3f, $"({gasMix.GasVolumeLiters():F1} л)");
+            Check("давление рассчитано", gasMix.PressureKPa > 100f, $"({gasMix.PressureKPa:F0} кПа)");
+            var noGas = new Mixture(subs, 0.01f);
+            noGas.AddVolumeML("water", 100f);
+            Check("жидкость не даёт газового объёма", noGas.GasVolumeLiters() < 0.01f);
+
+            Console.WriteLine("\n[цепочка реакций]");
+            var chain = new Mixture(subs, 0.05f) { Temperature = 400f };
+            chain.AddVolumeML("sulfuric", 30f);
+            chain.AddMoles("sodium_bicarbonate", 0.15f);
+            float totalHeat = 0f;
+            for (int step = 0; step < 300; step++)
+            {
+                foreach (var r in reactions.FindReactions(chain))
+                    totalHeat += reactions.Apply(r, chain, 0.02f, out _);
+                chain.Tick(0.02f);
+            }
+            Check("серная кислота + сода дают сульфат натрия", chain.Has("sodium_sulfate"), $"({chain.Describe()})");
+            Check("серная кислота + сода выделяют CO2", chain.Has("co2"), $"({chain.Moles("co2"):F3} моль)");
+            Check("в цепочке выделилось тепло", totalHeat > 0f, $"({totalHeat / 1000f:F1} кДж)");
+
             Console.WriteLine("\n[целостность контента]");
             var badRefs = new List<string>();
             foreach (var r in reactions.All)

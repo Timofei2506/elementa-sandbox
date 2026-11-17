@@ -95,6 +95,23 @@ namespace Elementa.Sim
             return vol > 1e-9f ? mass / vol : 1000f;
         }
 
+        /// <summary>
+        /// Estimates released gas volume (litres at 1 atm) for the current contents,
+        /// so gas-producing reactions can push lids, spin containers and hurt NPCs.
+        /// </summary>
+        public float GasVolumeLiters(float ambientK = 293f)
+        {
+            float moles = 0f;
+            foreach (var kv in _moles)
+            {
+                var s = Substances.TryGet(kv.Key);
+                if (s != null && s.phase == Phase.Gas) moles += kv.Value;
+            }
+            return moles * 24.0f * (Temperature / Mathf.Max(1f, ambientK));
+        }
+
+        public float PressureKPa => GasVolumeLiters() * 101.3f / Mathf.Max(0.001f, Volume);
+
         public float PH
         {
             get

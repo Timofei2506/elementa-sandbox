@@ -60,6 +60,69 @@
    }
   },
   {
+   "id": "acid_carbonate_sulfuric",
+   "ru": "Серная кислота + сода",
+   "reactants": {
+    "sulfuric": 1,
+    "sodium_bicarbonate": 2
+   },
+   "products": {
+    "sodium_sulfate": 1,
+    "water": 2,
+    "co2": 2
+   },
+   "dh": -42,
+   "temp": 273,
+   "catalyst": null,
+   "rate": 1.0,
+   "effects": {
+    "gas": "co2",
+    "fizz": 1
+   }
+  },
+  {
+   "id": "acid_carbonate_nitric",
+   "ru": "Азотная кислота + сода",
+   "reactants": {
+    "nitric": 1,
+    "sodium_bicarbonate": 1
+   },
+   "products": {
+    "sodium_nitrate": 1,
+    "water": 1,
+    "co2": 1
+   },
+   "dh": -31,
+   "temp": 273,
+   "catalyst": null,
+   "rate": 1.1,
+   "effects": {
+    "gas": "co2",
+    "fizz": 1
+   }
+  },
+  {
+   "id": "acid_carbonate_vinegar",
+   "ru": "Уксус + сода",
+   "reactants": {
+    "vinegar": 1,
+    "sodium_bicarbonate": 1
+   },
+   "products": {
+    "sodium_acetate": 1,
+    "water": 1,
+    "co2": 1
+   },
+   "dh": -28,
+   "temp": 273,
+   "catalyst": null,
+   "rate": 1.2,
+   "effects": {
+    "gas": "co2",
+    "fizz": 1
+   }
+  },
+  {
    "id": "acid_metal",
    "ru": "Кислота + металл",
    "reactants": {

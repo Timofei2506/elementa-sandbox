@@ -162,6 +162,20 @@ namespace Elementa.EditorTools
             }
         }
 
+        [MenuItem("ELEMENTA/5. Проверить сборку сцены (Play Mode)", priority = 5)]
+        public static void VerifyRuntimeScene()
+        {
+            // enters play mode and reports whether the boot sequence created every system
+            EditorApplication.isPlaying = true;
+            EditorApplication.delayCall += () =>
+            {
+                bool ok = UnityEngine.Object.FindAnyObjectByType<Game>() != null;
+                Debug.Log(ok
+                    ? "[ELEMENTA] Boot выполнен: система Game создана. Смотрите сцену в Game View."
+                    : "[ELEMENTA] Boot НЕ выполнен — проверьте Console на ошибки.");
+            };
+        }
+
         [MenuItem("ELEMENTA/Документация", priority = 20)]
         public static void OpenDocs()
         {
