@@ -87,6 +87,17 @@ namespace Elementa
             AddTopButton(bar, "Очистить", ref x, () => { Game.I.World.ClearAll(); Log("Сцена очищена."); });
             AddTopButton(bar, "Гравитация", ref x, () => { var w = Game.I.World; w.SetGravity(!w.GravityEnabled); Log("Гравитация: " + (w.GravityEnabled ? "вкл" : "выкл")); });
             AddTopButton(bar, "Каталог", ref x, () => ToggleCatalog());
+            AddTopButton(bar, "Сохранить", ref x, () =>
+            {
+                string path = SaveSystem.Save("quick_" + System.DateTime.Now.ToString("HHmmss"));
+                Log(path != null ? "Быстрое сохранение готово" : "Не удалось сохранить");
+            });
+            AddTopButton(bar, "Загрузить", ref x, () =>
+            {
+                var latest = SaveSystem.LatestSave();
+                if (latest == null) Log("Сохранений пока нет");
+                else SaveSystem.Load(latest);
+            });
             AddTopButton(bar, "Звук", ref x, () => { var a = AudioSystem.I; if (a != null) { a.SetMuted(!a.Muted); Log(a.Muted ? "Звук выключен" : "Звук включён"); } });
             AddTopButton(bar, "Помощь", ref x, () => ShowHelp());
         }
@@ -121,14 +132,15 @@ namespace Elementa
         }
         RectTransform _help;
 
+        const float TopButtonWidth = 86f;
         void AddTopButton(RectTransform bar, string caption, ref float x, Action action)
         {
-            var btn = UIFactory.Button(bar, caption, new Vector2(96f, 34f), action, Theme.PanelLight, Theme.FontSmall);
+            var btn = UIFactory.Button(bar, caption, new Vector2(TopButtonWidth, 34f), action, Theme.PanelLight, Theme.FontTiny);
             var rt = (RectTransform)btn.transform;
             rt.anchorMin = new Vector2(0f, 0.5f);
             rt.anchorMax = new Vector2(0f, 0.5f);
-            rt.anchoredPosition = new Vector2(x + 48f, 0f);
-            x += 102f;
+            rt.anchoredPosition = new Vector2(x + TopButtonWidth * 0.5f, 0f);
+            x += TopButtonWidth + 5f;
         }
 
         // ---------------- toolbar ----------------

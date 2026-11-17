@@ -21,6 +21,21 @@ namespace Elementa
 
         public static string Directory => Path.Combine(Application.persistentDataPath, "scenes");
 
+        /// <summary>Most recent save name, used for a quick "continue" from the UI.</summary>
+        public static string LatestSave()
+        {
+            var saves = ListSaves();
+            if (saves.Count == 0) return null;
+            string newest = null;
+            DateTime newestTime = DateTime.MinValue;
+            foreach (var s in saves)
+            {
+                var info = new FileInfo(Path.Combine(Directory, s + ".json"));
+                if (info.Exists && info.LastWriteTimeUtc > newestTime) { newestTime = info.LastWriteTimeUtc; newest = s; }
+            }
+            return newest;
+        }
+
         public static string Save(string name)
         {
             var world = Game.I.World;

@@ -190,7 +190,14 @@ namespace Elementa
                 case ToolId.Hammer: if (firstPress || Time.time - _lastUse > 0.25f) HammerHit(hit); break;
                 case ToolId.SpawnNpc: if (firstPress) SpawnNpc(hit.point); break;
                 case ToolId.Delete: if (firstPress || Time.time - _lastUse > 0.12f) DeleteTarget(hit); break;
-                case ToolId.TimeControl: if (firstPress) CycleTime(); break;
+                case ToolId.TimeControl:
+                    if (firstPress) CycleTime();
+                    else
+                    {
+                        // holding the time tool near objects creates a slow-motion bubble
+                        SlowMotionBubble(hit.point);
+                    }
+                    break;
             }
             _lastUse = Time.time;
         }
@@ -292,6 +299,10 @@ namespace Elementa
         void SpawnMaterialAt(Vector3 point)
         {
             if (SelectedMaterial == null) return;
+            const float limit = WorldEnvironment.ArenaHalfSize - 1.5f;
+            point.x = Mathf.Clamp(point.x, -limit, limit);
+            point.z = Mathf.Clamp(point.z, -limit, limit);
+            point.y = Mathf.Clamp(point.y, 0.2f, 12f);
             var pos = point + Vector3.up * (0.6f * SpawnScale);
             Vector3 size = SelectedShape switch
             {
@@ -420,6 +431,20 @@ namespace Elementa
             }
             else if (npc != null) npc.Remove();
             else if (container != null) container.BreakOpen();
+        }
+
+        void SlowMotionBubble(Vector3 center)
+        {
+            foreach (var obj in _world.Objects)
+            {
+                if (obj == null || obj.Body == null) continue;
+                float d = Vector3.Distance(obj.transform.position, center);
+                if (d > 3.5f) continue;
+                obj.Body.velocity *= 0.9f;
+                obj.Body.angularVelocity *= 0.9f;
+                obj.AddHeat(-40f);
+            }
+            EffectsSystem.SpawnSmoke(center, 0.7f, 0.6f, 0.25f);
         }
 
         void CycleTime()
