@@ -49,6 +49,8 @@ namespace Elementa
             var ui = UIRoot.Create();
             game.UI = ui;
 
+            AudioSystem.Create(world.transform);
+            worldGo.AddComponent<ThermalSystem>();
             PlayerController.Create(world);
             world.BuildStarterScene();
 

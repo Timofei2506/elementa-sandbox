@@ -52,6 +52,8 @@ S=[
 ("mercury","Ртуть","Mercury","Hg","liquid",13534,"#B8BCC0",7,0,0,0,0,1.0,0.1,200.59,0),
 ("cyanide","Цианид калия","Potassium cyanide","KCN","solid",1520,"#F0F0EC",11,1,0,0,0,1.0,0.4,65.12,0),
 ("hydrogen_sulfide","Сероводород","Hydrogen sulfide","H2S","gas",1.36,"#E8E8C8",5,1,1,0,573,0.95,0.3,34.08,0),
+("acetylene","Ацетилен","Acetylene","C2H2","gas",1.1,"#E8E0F0",7,0,1,0,598,0.4,0,26.04,48.2),
+("limewater","Известковая вода","Limewater","Ca(OH)2(aq)","liquid",1050,"#E6E9E4",12.4,1,0,0,0,0.1,0.3,74.09,0),
 ("co2","Углекислый газ","Carbon dioxide","CO2","gas",1.98,"#DCE4E8",7,0,0,0,0,0.3,0,44.01,0),
 ("co","Угарный газ","Carbon monoxide","CO","gas",1.14,"#DCDCDC",7,0,1,0,882,1.0,0,28.01,10.1),
 ("so2","Диоксид серы","Sulfur dioxide","SO2","gas",2.63,"#EDE8B8",3,1,0,0,0,0.8,0.5,64.07,0),
@@ -98,12 +100,12 @@ R=[
 ("lava_organic","Лава + органика",{"lava":1,"gasoline":1},{"co2":8,"water":0},-4000,373,None,2.5,{"fire":1,"smoke":1}),
 ("acid_skin","Кислота + органика",{"sulfuric":1},{"water":0},-120,273,None,0.6,{"corrode":1}),
 ("cyanide_acid","Цианид + кислота",{"cyanide":1,"hcl":1},{"hydrogen_sulfide":0.0},-60,273,None,2.0,{"gas":"hydrogen_sulfide","toxic":1}),
-("mercury_sulfur","Ртуть + сера",{"mercury":1,"sulfur_powder":1},{"color_shift":0},-60,273,None,0.1,{"precipitate":"HgS"}),
+("mercury_sulfur","Ртуть + сера",{"mercury":1,"sulfur_powder":1},{},-60,273,None,0.1,{"precipitate":"HgS","color_shift":1}),
 ("oxygen_fire","Кислород + горючее",{"oxygen":1,"gasoline":1},{"co2":8},-3000,280,None,1.5,{"fire":1,"heat":1}),
 ("liquid_oxygen_explode","Жидкий кислород + органика",{"liquid_oxygen":1,"kerosene":1},{"co2":8,"water":9},-6000,273,None,7.0,{"explosion":1.8,"flash":1}),
 ("no2_water","NO2 + вода",{"no2":3,"water":1},{"nitric":2,"no2":0},-117,273,None,0.4,{"gas":"no2"}),
 ("so2_water","SO2 + вода",{"so2":1,"water":1},{"sulfuric":1},-90,273,None,0.3,{"color_shift":1}),
-("co2_water","CO2 + вода",{"co2":1,"water":1},{"limewater":0},-20,273,None,0.2,{"color_shift":0.4}),
+("co2_water","CO2 + вода",{"co2":1,"water":1},{"limewater":1},-20,273,None,0.2,{"color_shift":0.4}),
 ]
 reactions=[dict(id=i,ru=r,reactants=re,products=pr,dh=dh,temp=t,catalyst=c,rate=rt,effects=ef) for (i,r,re,pr,dh,t,c,rt,ef) in R]
 json.dump({"reactions":reactions}, open(f"{OUT}/reactions.json","w"), ensure_ascii=False, indent=1)

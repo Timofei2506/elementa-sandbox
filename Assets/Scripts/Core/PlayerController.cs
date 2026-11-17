@@ -3,6 +3,7 @@ using System.Collections.Generic;
 using System.Linq;
 using Elementa.Sim;
 using UnityEngine;
+using UnityEngine.EventSystems;
 
 namespace Elementa
 {
@@ -84,40 +85,59 @@ namespace Elementa
         void Update()
         {
             if (Game.I == null || _world == null) return;
-            if (Game.I.UI != null && Game.I.UI.BlocksCameraInput && Input.GetMouseButton(0) && !Input.GetMouseButtonDown(0)) return;
 
             HandleKeyboardShortcuts();
 
-            bool overUI = Game.I.UI != null && Game.I.UI.BlocksCameraInput;
-            bool down = Input.GetMouseButtonDown(0) && !overUI;
-            bool held = Input.GetMouseButton(0) && !overUI;
-            bool up = Input.GetMouseButtonUp(0);
+            bool overUI = IsPointerOverUI();
+            if (Game.I.UI != null) Game.I.UI.SetPointerOverUI(overUI);
 
-            if (Input.touchCount == 1 && Input.GetTouch(0).phase == TouchPhase.Began && !overUI)
+            if (Input.touchCount == 1)
             {
-                _pointerDown = true;
-                _pointerPos = Input.GetTouch(0).position;
-                UseTool(_pointerPos, true);
+                var touch = Input.GetTouch(0);
+                _pointerPos = touch.position;
+                if (touch.phase == TouchPhase.Began && !overUI)
+                {
+                    _pointerDown = true;
+                    UseTool(_pointerPos, true);
+                }
+                else if (touch.phase == TouchPhase.Moved && _pointerDown && CurrentTool is ToolId.Heat or ToolId.Hammer or ToolId.Shoot or ToolId.Select)
+                {
+                    UseTool(_pointerPos, false);
+                }
+                else if (touch.phase is TouchPhase.Ended or TouchPhase.Canceled)
+                {
+                    _pointerDown = false;
+                    EndDrag();
+                }
             }
-            else if (Input.touchCount == 1 && Input.GetTouch(0).phase == TouchPhase.Moved && _pointerDown && CurrentTool is ToolId.Heat or ToolId.Hammer or ToolId.Shoot)
-            {
-                _pointerPos = Input.GetTouch(0).position;
-                UseTool(_pointerPos, false);
-            }
-            else if (Input.touchCount == 1 && (Input.GetTouch(0).phase is TouchPhase.Ended or TouchPhase.Canceled))
-            {
-                _pointerDown = false;
-                EndDrag();
-            }
-            else if (Input.GetMouseButton(0) || Input.GetMouseButtonUp(0) || Input.GetMouseButtonDown(0))
+            else
             {
                 _pointerPos = Input.mousePosition;
-                if (down) UseTool(_pointerPos, true);
-                else if (held) UseTool(_pointerPos, false);
-                if (up) EndDrag();
+                if (Input.GetMouseButtonDown(0) && !overUI)
+                {
+                    _pointerDown = true;
+                    UseTool(_pointerPos, true);
+                }
+                else if (Input.GetMouseButton(0) && _pointerDown)
+                {
+                    UseTool(_pointerPos, false);
+                }
+                if (Input.GetMouseButtonUp(0)) { _pointerDown = false; EndDrag(); }
             }
 
             UpdateRaycastTarget(_pointerPos);
+            UpdateHoverIndicator(_pointerPos);
+        }
+
+        static readonly List<RaycastResult> _uiHits = new List<RaycastResult>();
+        static bool IsPointerOverUI()
+        {
+            var es = EventSystem.current;
+            if (es == null) return false;
+            var data = new PointerEventData(es) { position = Input.touchCount > 0 ? Input.GetTouch(0).position : (Vector2)Input.mousePosition };
+            _uiHits.Clear();
+            es.RaycastAll(data, _uiHits);
+            return _uiHits.Count > 0;
         }
 
         void HandleKeyboardShortcuts()
@@ -131,6 +151,8 @@ namespace Elementa
             if (Input.GetKeyDown(KeyCode.Alpha7)) SelectTool(ToolId.Hammer);
             if (Input.GetKeyDown(KeyCode.Alpha8)) SelectTool(ToolId.SpawnNpc);
             if (Input.GetKeyDown(KeyCode.Alpha9)) SelectTool(ToolId.Delete);
+            if (Input.GetKeyDown(KeyCode.Alpha0)) SelectTool(ToolId.TimeControl);
+            if (Input.GetKeyDown(KeyCode.F1) && Game.I.UI != null) Game.I.UI.ShowHelp();
             if (Input.GetKeyDown(KeyCode.Space)) _world.TimeScale = _world.TimeScale > 0.01f ? 0f : 1f;
             if (Input.GetKeyDown(KeyCode.R)) _world.ResetWorld();
             if (Input.GetKeyDown(KeyCode.Delete) && Selected != null) { Destroy(Selected.gameObject); Selected = null; }
@@ -178,9 +200,24 @@ namespace Elementa
             }
         }
 
-        void EndDrag()
+        void EndDrag() => _dragged = null;
+
+        Transform _indicator;
+        void UpdateHoverIndicator(Vector3 screenPos)
         {
-            _dragged = null;
+            if (_indicator == null)
+            {
+                var go = GameObject.CreatePrimitive(PrimitiveType.Cylinder);
+                go.name = "HoverIndicator";
+                Destroy(go.GetComponent<Collider>());
+                go.transform.localScale = new Vector3(0.55f, 0.01f, 0.55f);
+                go.GetComponent<MeshRenderer>().sharedMaterial = RuntimeVisuals.For(Look.Emissive, new Color(0.24f, 0.83f, 0.78f), 0.2f, 0f, 1.6f);
+                _indicator = go.transform;
+            }
+            bool show = CurrentTool is ToolId.SpawnMaterial or ToolId.SpawnNpc or ToolId.Ignite;
+            _indicator.gameObject.SetActive(show && !_pointerDown);
+            if (!show) return;
+            if (_rig.ScreenToGround(screenPos, out var ground)) _indicator.position = ground + Vector3.up * 0.03f;
         }
 
         void UpdateRaycastTarget(Vector3 screenPos)
@@ -277,6 +314,8 @@ namespace Elementa
             {
                 var origin = ray.origin + ray.direction * 1.2f;
                 Weapons.Fire(origin, ray.direction);
+                var w = Weapons.Current;
+                AudioSystem.I?.Play(w.caliberMM > 20f ? "cannon" : "shot", w.caliberMM > 20f ? 0.9f : 0.5f, UnityEngine.Random.Range(0.94f, 1.06f));
             }
             else if (Weapons.Ammo <= 0)
             {
@@ -331,6 +370,7 @@ namespace Elementa
                 // impact damage scales with hardness of the surface and hammer energy
                 float damage = 40f + obj.Material.hardness * 0.02f;
                 obj.ApplyDamage(damage, 900f);
+                AudioSystem.I?.ImpactFor(obj.Material, 1f);
                 if (obj.Body != null) obj.Body.AddForceAtPosition(hit.normal * -force, hit.point, ForceMode.Impulse);
                 EffectsSystem.SpawnSparks(hit.point, hit.normal, 8, 4f);
                 ScreenShake.Impact(1f);

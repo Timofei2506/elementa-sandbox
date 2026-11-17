@@ -84,7 +84,39 @@ namespace Elementa
             AddTopButton(bar, "Очистить", ref x, () => { Game.I.World.ClearAll(); Log("Сцена очищена."); });
             AddTopButton(bar, "Гравитация", ref x, () => { var w = Game.I.World; w.SetGravity(!w.GravityEnabled); Log("Гравитация: " + (w.GravityEnabled ? "вкл" : "выкл")); });
             AddTopButton(bar, "Каталог", ref x, () => ToggleCatalog());
+            AddTopButton(bar, "Звук", ref x, () => { var a = AudioSystem.I; if (a != null) { a.SetMuted(!a.Muted); Log(a.Muted ? "Звук выключен" : "Звук включён"); } });
+            AddTopButton(bar, "Помощь", ref x, () => ShowHelp());
         }
+
+        /// <summary>Full-screen help overlay listing every control.</summary>
+        public void ShowHelp()
+        {
+            if (_help != null) { Destroy(_help.gameObject); _help = null; return; }
+            var overlay = UIFactory.Box(Root, "Help", Vector2.zero, Vector2.one, Vector2.zero, Vector2.zero, new Color(0f, 0f, 0f, 0.72f));
+            _help = overlay;
+            var panel = UIFactory.Panel(overlay, "HelpPanel", Theme.Panel);
+            UIFactory.SetAnchors(panel, new Vector2(0.5f, 0.5f), new Vector2(0.5f, 0.5f), new Vector2(-330f, -260f), new Vector2(330f, 260f));
+            var title = UIFactory.Label(panel, "УПРАВЛЕНИЕ", Theme.FontHeader, Theme.Accent, TextAnchor.MiddleCenter, FontStyle.Bold);
+            UIFactory.SetAnchors((RectTransform)title.transform, new Vector2(0f, 1f), new Vector2(1f, 1f), new Vector2(0f, -46f), new Vector2(0f, -8f));
+            string text =
+                "<b>Мышь</b>\n" +
+                "ЛКМ — применить инструмент · ПКМ + мышь — вращать камеру · колесо — зум\n" +
+                "WASD — панорама · Q/E — поворот · F — центрировать\n\n" +
+                "<b>Горячие клавиши</b>\n" +
+                "1 Курсор · 2 Материал · 3 Жидкость · 4 Оружие · 5 Огонь\n" +
+                "6 Жар · 7 Молот · 8 NPC · 9 Разрушение · 0 Время\n" +
+                "Space — пауза · R — сброс · Tab — каталог · Enter — перезарядка\n\n" +
+                "<b>Телефон</b>\n" +
+                "Один палец — вращение камеры · два пальца — зум · тап — инструмент\n" +
+                "Нижняя панель — инструменты, каталог, пауза\n\n" +
+                "<i>Совет: термит + магний даёт расплав стали, белизна + кислота — хлор.</i>";
+            var body = UIFactory.Label(panel, text, Theme.FontBody, Theme.Text, TextAnchor.UpperLeft);
+            UIFactory.SetAnchors((RectTransform)body.transform, Vector2.zero, Vector2.one, new Vector2(22f, 60f), new Vector2(-22f, -54f));
+            body.lineSpacing = 1.15f;
+            var close = UIFactory.Button(panel, "Закрыть", new Vector2(140f, 38f), () => { Destroy(overlay.gameObject); _help = null; }, Theme.PanelLight);
+            UIFactory.SetAnchors((RectTransform)close.transform, new Vector2(0.5f, 0f), new Vector2(0.5f, 0f), new Vector2(-70f, 12f), new Vector2(70f, 50f));
+        }
+        RectTransform _help;
 
         void AddTopButton(RectTransform bar, string caption, ref float x, Action action)
         {

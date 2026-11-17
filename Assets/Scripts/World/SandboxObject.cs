@@ -55,7 +55,7 @@ namespace Elementa
             };
             go.AddComponent<MeshFilter>().sharedMesh = mesh;
             var mr = go.AddComponent<MeshRenderer>();
-            mr.sharedMaterial = RuntimeVisuals.ForMaterial(mat);
+            mr.sharedMaterial = RuntimeVisuals.ForDef(mat);
 
             var col = go.AddComponent<Collider>();
             switch (shape)

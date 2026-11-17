@@ -80,10 +80,13 @@ namespace Elementa
             return rt;
         }
 
-        public static void Round(Graphic g, float radius = 10f)
+        /// <summary>Applies the procedural rounded sprite as a 9-slice so the image scales cleanly.</summary>
+        public static void Round(Graphic g, float radius = 12f)
         {
             var img = g as Image;
             if (img == null) return;
+            img.sprite = RuntimeVisuals.Rounded(64, Mathf.Clamp((int)radius, 4, 28));
+            img.type = Image.Type.Sliced;
         }
 
         public static RectTransform Panel(Transform parent, string name, Color color, float radius = 14f)
@@ -242,6 +245,9 @@ namespace Elementa
 
             var contentRt = Box(viewportRt, "Content", new Vector2(0f, 1f), new Vector2(1f, 1f), Vector2.zero, Vector2.zero);
             contentRt.pivot = new Vector2(0.5f, 1f);
+            var fitter = contentRt.gameObject.AddComponent<ContentSizeFitter>();
+            fitter.verticalFit = ContentSizeFitter.FitMode.PreferredSize;
+            fitter.horizontalFit = ContentSizeFitter.FitMode.Unconstrained;
 
             var scroll = viewportRt.gameObject.AddComponent<ScrollRect>();
             scroll.horizontal = false;

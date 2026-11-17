@@ -221,6 +221,24 @@ namespace Elementa.Tests
             Check("все материалы имеют положительную прочность", mats.All.All(m => m.strength > 0));
             Check("все материалы имеют теплоёмкость", mats.All.All(m => m.heat > 0));
 
+            Console.WriteLine("\n[целостность контента]");
+            var badRefs = new List<string>();
+            foreach (var r in reactions.All)
+            {
+                foreach (var k in r.reactants.Keys) if (!subs.Has(k)) badRefs.Add($"{r.id}: реагент {k}");
+                foreach (var k in r.products.Keys) if (!subs.Has(k)) badRefs.Add($"{r.id}: продукт {k}");
+                if (!string.IsNullOrEmpty(r.effects.gas) && !subs.Has(r.effects.gas)) badRefs.Add($"{r.id}: газ {r.effects.gas}");
+            }
+            Check("все реакции ссылаются на существующие вещества", badRefs.Count == 0, badRefs.Count > 0 ? string.Join("; ", badRefs.Take(4)) : "");
+            var badMats = mats.All.Where(m => string.IsNullOrEmpty(m.nameRu) || m.color.a < 0.5f).Select(m => m.id).ToList();
+            Check("у всех материалов есть название и цвет", badMats.Count == 0, string.Join(",", badMats.Take(3)));
+            var badSubs = subs.All.Where(x => x.molarMass <= 0 || x.density <= 0).Select(x => x.id).ToList();
+            Check("у всех веществ валидная масса и плотность", badSubs.Count == 0, string.Join(",", badSubs.Take(3)));
+            var badWeapons = weapons.All.Where(w => w.velocity <= 0 || w.caliberMM <= 0).Select(w => w.id).ToList();
+            Check("у всех оружий валидная баллистика", badWeapons.Count == 0, string.Join(",", badWeapons.Take(3)));
+            Check("каждый элемент таблицы имеет символ и имя",
+                elements.All(e => !string.IsNullOrEmpty(Json.Str(e, "sym")) && !string.IsNullOrEmpty(Json.Str(e, "ru"))));
+
             Console.WriteLine($"\n=== ИТОГО: {_pass} passed, {_fail} failed ===");
             return _fail == 0 ? 0 : 1;
         }

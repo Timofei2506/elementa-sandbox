@@ -598,15 +598,14 @@
     "mercury": 1,
     "sulfur_powder": 1
    },
-   "products": {
-    "color_shift": 0
-   },
+   "products": {},
    "dh": -60,
    "temp": 273,
    "catalyst": null,
    "rate": 0.1,
    "effects": {
-    "precipitate": "HgS"
+    "precipitate": "HgS",
+    "color_shift": 1
    }
   },
   {
@@ -693,7 +692,7 @@
     "water": 1
    },
    "products": {
-    "limewater": 0
+    "limewater": 1
    },
    "dh": -20,
    "temp": 273,

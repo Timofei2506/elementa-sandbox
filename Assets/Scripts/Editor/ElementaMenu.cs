@@ -88,7 +88,7 @@ namespace Elementa.EditorTools
         /// </summary>
         public static void EnsureAlwaysIncludedShaders()
         {
-            string[] names = { "Standard", "Sprites/Default", "Skybox/Panoramic", "Unlit/Color" };
+            string[] names = { "Standard", "Sprites/Default", "Skybox/Panoramic", "Unlit/Color", "UI/Default", "Particles/Standard Unlit", "Skybox/Procedural" };
             var graphicsSettings = AssetDatabase.LoadAssetAtPath<UnityEngine.Object>("ProjectSettings/GraphicsSettings.asset");
             if (graphicsSettings == null) return;
             var so = new SerializedObject(graphicsSettings);

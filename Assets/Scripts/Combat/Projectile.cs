@@ -64,7 +64,7 @@ namespace Elementa
             p._trail.time = stats.kind == ProjectileKind.Laser ? 0.12f : 0.055f;
             p._trail.startWidth = scale * 1.6f;
             p._trail.endWidth = 0f;
-            p._trail.material = RuntimeVisuals.For(Look.Emissive, tracer, 0.3f, 0f, 3f);
+            p._trail.material = RuntimeVisuals.TrailMaterial(tracer);
             p._trail.numCapVertices = 2;
             p._trail.minVertexDistance = 0.05f;
 

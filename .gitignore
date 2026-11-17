@@ -32,3 +32,8 @@ crashlytics-build.properties
 .DS_Store
 # Workspace tooling
 tools/unityref/
+bin/
+bin/
+obj/
+*.dll
+!tools/unityref/**

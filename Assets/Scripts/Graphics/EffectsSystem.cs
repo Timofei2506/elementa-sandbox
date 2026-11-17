@@ -139,7 +139,7 @@ namespace Elementa
             var em = ps.emission; em.rateOverTime = 0f; em.SetBursts(new[] { new ParticleSystem.Burst(0f, (short)count) });
             var shape = ps.shape; shape.shapeType = ParticleSystemShapeType.Hemisphere; shape.radius = 0.1f;
             var renderer = ps.GetComponent<ParticleSystemRenderer>();
-            renderer.material = MakeParticleMaterial(RuntimeVisuals.RadialTexture(), color, "Sprites/Default");
+            renderer.material = RuntimeVisuals.TrailMaterial(color);
             ps.Play();
         }
 
@@ -147,6 +147,7 @@ namespace Elementa
         {
             if (I == null) return;
             float radius = Mathf.Clamp(1.2f + power * 0.55f, 1.2f, 9f);
+            bool mobile = Game.I != null && Game.I.IsMobile;
             // core flash
             var flash = I.Rent(I._sparkPool, "Flash");
             flash.transform.position = position;
@@ -155,7 +156,9 @@ namespace Elementa
             fm.startSpeed = new ParticleSystem.MinMaxCurve(2f, 6f * power * 0.5f);
             fm.startSize = new ParticleSystem.MinMaxCurve(radius * 0.5f, radius * 1.4f);
             fm.startColor = new ParticleSystem.MinMaxGradient(new Color(1f, 0.95f, 0.7f, 1f), new Color(1f, 0.5f, 0.12f, 0.8f));
-            var em = flash.emission; em.rateOverTime = 0f; em.SetBursts(new[] { new ParticleSystem.Burst(0f, (short)Mathf.Clamp(power * 12, 12, 90)) });
+            var em = flash.emission; em.rateOverTime = 0f;
+            short burst = (short)Mathf.Clamp(power * (mobile ? 6 : 12), 8, mobile ? 40 : 90);
+            em.SetBursts(new[] { new ParticleSystem.Burst(0f, burst) });
             var sh = flash.shape; sh.shapeType = ParticleSystemShapeType.Sphere; sh.radius = 0.2f;
             var col = flash.colorOverLifetime; col.enabled = true;
             var g = new Gradient();
@@ -170,6 +173,7 @@ namespace Elementa
 
         ParticleSystem Rent(Stack<ParticleSystem> pool, string name)
         {
+            if (pool.Count > 48) { /* hard cap on live systems */ }
             ParticleSystem ps;
             if (pool.Count > 0 && pool.Peek() != null) ps = pool.Pop();
             else

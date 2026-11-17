@@ -98,6 +98,7 @@ namespace Elementa
             float joules = powerGramsTNT * 4184f;
 
             EffectsSystem.SpawnExplosion(center, Mathf.Clamp(powerGramsTNT / 200f, 0.4f, 6f));
+            AudioSystem.I?.Play("boom", Mathf.Clamp01(powerGramsTNT / 300f), UnityEngine.Random.Range(0.85f, 1f));
 
             foreach (var obj in Objects.ToList())
             {

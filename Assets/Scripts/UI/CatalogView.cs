@@ -14,7 +14,7 @@ namespace Elementa
     /// </summary>
     public class CatalogView : MonoBehaviour, IPointerEnterHandler, IPointerExitHandler
     {
-        public enum Tab { Materials, Chemicals, Weapons, Npc, Settings }
+        public enum Tab { Materials, Chemicals, Weapons, Elements, Scenarios, Npc, Settings }
         public Tab CurrentTab { get; private set; } = Tab.Materials;
 
         UIRoot _ui;
@@ -39,8 +39,8 @@ namespace Elementa
             foreach (Tab tab in Enum.GetValues(typeof(Tab)))
             {
                 var t = tab;
-                var btn = UIFactory.Button(_tabBar, TabName(tab), new Vector2(66f, 34f), () => SetTab(t), Theme.Card, Theme.FontTiny);
-                btn.gameObject.AddComponent<LayoutElement>().preferredWidth = tab == Tab.Settings ? 74f : 66f;
+                var btn = UIFactory.Button(_tabBar, TabName(tab), new Vector2(60f, 34f), () => SetTab(t), Theme.Card, Theme.FontTiny);
+                btn.gameObject.AddComponent<LayoutElement>().preferredWidth = 62f;
                 _tabButtons.Add(btn.gameObject);
             }
 
@@ -62,6 +62,8 @@ namespace Elementa
             Tab.Materials => "Материалы",
             Tab.Chemicals => "Химия",
             Tab.Weapons => "Оружие",
+            Tab.Elements => "Элементы",
+            Tab.Scenarios => "Сцены",
             Tab.Npc => "NPC",
             _ => "Настройки"
         };
@@ -75,6 +77,10 @@ namespace Elementa
         void ClearList()
         {
             for (int i = _list.childCount - 1; i >= 0; i--) Destroy(_list.GetChild(i).gameObject);
+            var table = _list.GetComponent<PeriodicTableView>();
+            if (table != null) Destroy(table);
+            var vl = _list.GetComponent<VerticalLayoutGroup>();
+            if (vl != null) vl.enabled = true;
         }
 
         void Rebuild()
@@ -86,6 +92,8 @@ namespace Elementa
                 case Tab.Chemicals: BuildChemicals(); break;
                 case Tab.Weapons: BuildWeapons(); break;
                 case Tab.Npc: BuildNpcs(); break;
+                case Tab.Elements: BuildPeriodicTable(); break;
+                case Tab.Scenarios: BuildScenarios(); break;
                 case Tab.Settings: BuildSettings(); break;
             }
         }
@@ -240,6 +248,61 @@ namespace Elementa
                 btn.gameObject.AddComponent<LayoutElement>().preferredHeight = 34f;
             }
             _footer.text = "Создавайте персонажей и меняйте их поведение";
+        }
+
+        void BuildPeriodicTable()
+        {
+            var view = _list.gameObject.GetComponent<PeriodicTableView>();
+            if (view == null) view = _list.gameObject.AddComponent<PeriodicTableView>();
+            // the periodic table wants free layout, not the vertical list
+            var vl = _list.GetComponent<VerticalLayoutGroup>();
+            if (vl != null) vl.enabled = false;
+            view.Build(_list);
+            _footer.text = $"{Game.I.Elements.Count} элементов · двойной клик — создать блок";
+        }
+
+        void BuildScenarios()
+        {
+            AddSectionHeader("Готовые сцены");
+            foreach (var scenario in ScenarioLibrary.All())
+            {
+                var sc = scenario;
+                var row = UIFactory.Box(_list, "Sc_" + sc.id, new Vector2(0f, 1f), new Vector2(1f, 1f), Vector2.zero, new Vector2(0f, 46f), Theme.Card);
+                row.gameObject.AddComponent<LayoutElement>().preferredHeight = 46f;
+                var name = UIFactory.Label(row, sc.nameRu, Theme.FontBody, Theme.Text);
+                UIFactory.SetAnchors((RectTransform)name.transform, Vector2.zero, Vector2.one, new Vector2(10f, 18f), new Vector2(-8f, -2f));
+                var desc = UIFactory.Label(row, sc.description, Theme.FontTiny, Theme.TextDim);
+                UIFactory.SetAnchors((RectTransform)desc.transform, Vector2.zero, Vector2.one, new Vector2(10f, 2f), new Vector2(-8f, -24f));
+                var btn = row.gameObject.AddComponent<Button>();
+                btn.targetGraphic = row.GetComponent<Image>();
+                btn.onClick.AddListener(() => ScenarioLibrary.Load(sc.id));
+            }
+
+            AddSectionHeader("Сохранение");
+            var saveRow = UIFactory.Box(_list, "SaveRow", new Vector2(0f, 1f), new Vector2(1f, 1f), Vector2.zero, new Vector2(0f, 40f));
+            saveRow.gameObject.AddComponent<LayoutElement>().preferredHeight = 40f;
+            var h = UIFactory.HLayout(saveRow, 6f, new RectOffset(2, 2, 4, 4));
+            var saveBtn = UIFactory.Button(saveRow, "Сохранить сцену", new Vector2(120f, 32f), () =>
+            {
+                string name = "scene_" + System.DateTime.Now.ToString("MMdd_HHmm");
+                SaveSystem.Save(name);
+            }, Theme.AccentDim, Theme.FontSmall);
+            saveBtn.gameObject.AddComponent<LayoutElement>().preferredWidth = 130f;
+
+            var saves = SaveSystem.ListSaves();
+            AddSectionHeader(saves.Count > 0 ? "Загрузить" : "Сохранений пока нет");
+            foreach (var name in saves)
+            {
+                var n = name;
+                var row = UIFactory.Box(_list, "Save_" + n, new Vector2(0f, 1f), new Vector2(1f, 1f), Vector2.zero, new Vector2(0f, 34f), Theme.Card);
+                row.gameObject.AddComponent<LayoutElement>().preferredHeight = 34f;
+                var label = UIFactory.Label(row, n, Theme.FontSmall, Theme.Text);
+                UIFactory.SetAnchors((RectTransform)label.transform, Vector2.zero, Vector2.one, new Vector2(10f, 0f), new Vector2(-10f, 0f));
+                var btn = row.gameObject.AddComponent<Button>();
+                btn.targetGraphic = row.GetComponent<Image>();
+                btn.onClick.AddListener(() => SaveSystem.Load(n));
+            }
+            _footer.text = "Сцены и сохранения";
         }
 
         void BuildSettings()

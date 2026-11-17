@@ -51,6 +51,7 @@ namespace Elementa
             switch (look)
             {
                 case Look.Glass:
+                    mat.SetOverrideTag("RenderType", "Transparent");
                     mat.SetFloat("_Mode", 3);
                     mat.SetInt("_SrcBlend", (int)BlendMode.SrcAlpha);
                     mat.SetInt("_DstBlend", (int)BlendMode.OneMinusSrcAlpha);
@@ -75,6 +76,17 @@ namespace Elementa
             }
             _cache[key] = mat;
             return mat;
+        }
+
+        static readonly Dictionary<string, Material> _matCache = new Dictionary<string, Material>();
+        public static Material ForDef(MaterialDef def)
+        {
+            if (def == null) return For(Look.Polymer, Color.gray);
+            if (_matCache.TryGetValue(def.id, out var m) && m != null) return m;
+            m = ForMaterial(def);
+            m.name = "ELEMENTA_" + def.id;
+            _matCache[def.id] = m;
+            return m;
         }
 
         public static Material ForMaterial(MaterialDef def, float damageTint = 0f, float temperature = 293f)
@@ -168,6 +180,49 @@ namespace Elementa
             return tex;
         }
 
+        /// <summary>9-sliced rounded rectangle sprite so every panel has soft corners.</summary>
+        public static Sprite Rounded(int size = 64, int radius = 18)
+        {
+            string key = $"r{size}_{radius}";
+            if (_rounded.TryGetValue(key, out var cached) && cached != null) return cached;
+            var tex = new Texture2D(size, size, TextureFormat.RGBA32, false)
+            {
+                name = "ELEMENTA_Rounded", wrapMode = TextureWrapMode.Clamp, filterMode = FilterMode.Bilinear
+            };
+            var px = new Color32[size * size];
+            float r = radius;
+            for (int y = 0; y < size; y++)
+            {
+                for (int x = 0; x < size; x++)
+                {
+                    float cx = Mathf.Clamp(x + 0.5f, r, size - r);
+                    float cy = Mathf.Clamp(y + 0.5f, r, size - r);
+                    float d = Vector2.Distance(new Vector2(x + 0.5f, y + 0.5f), new Vector2(cx, cy));
+                    float a = Mathf.Clamp01(r - d + 0.5f);
+                    px[y * size + x] = new Color(1f, 1f, 1f, a);
+                }
+            }
+            tex.SetPixels32(px);
+            tex.Apply();
+            var sprite = UnityEngine.Sprite.Create(tex, new Rect(0, 0, size, size), new Vector2(0.5f, 0.5f), 100f, 0,
+                SpriteMeshType.FullRect, new Vector4(radius + 2, radius + 2, radius + 2, radius + 2));
+            sprite.name = "ELEMENTA_RoundedSprite";
+            _rounded[key] = sprite;
+            return sprite;
+        }
+        static readonly Dictionary<string, Sprite> _rounded = new Dictionary<string, Sprite>();
+
+        public static Material TrailMaterial(Color color)
+        {
+            string key = $"trail{(int)(color.r * 20)}{(int)(color.g * 20)}{(int)(color.b * 20)}";
+            if (_trails.TryGetValue(key, out var m) && m != null) return m;
+            var sh = Shader.Find("Sprites/Default") ?? Standard;
+            m = new Material(sh) { name = "ELEMENTA_Trail", mainTexture = White, color = color };
+            _trails[key] = m;
+            return m;
+        }
+        static readonly Dictionary<string, Material> _trails = new Dictionary<string, Material>();
+
         public static Material Sprite()
         {
             var sh = Shader.Find("Sprites/Default");
@@ -179,6 +234,9 @@ namespace Elementa
         {
             _cache.Clear();
             _lookCache.Clear();
+            _rounded.Clear();
+            _trails.Clear();
+            _matCache.Clear();
         }
     }
 }
