@@ -8,12 +8,20 @@ on:
 
 jobs:
   simulate:
-    name: Simulation core tests (no Unity required)
+    name: Physics, chemistry & content tests
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
+
       - uses: actions/setup-dotnet@v4
         with:
           dotnet-version: '8.0.x'
-      - name: Run physics & chemistry test suite
+
+      - name: Validate content data
+        run: python3 tools/datatest/verify_data.py
+
+      - name: Static source checks
+        run: python3 tools/import_check.py
+
+      - name: Run simulation test suite
         run: dotnet run --project tools/simtest/SimTest.csproj -c Release

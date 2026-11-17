@@ -103,6 +103,16 @@ Assets/
   "effects": { "heat": 1, "fizz": 1 } }
 ```
 
+## Проверки
+
+```bash
+python3 tools/datatest/verify_data.py     # валидация JSON-контента
+python3 tools/import_check.py             # статическая проверка C#
+dotnet run --project tools/simtest        # 71 тест физики/химии/баллистики
+```
+
+Все три проверки прогоняются в GitHub Actions на каждый пуш.
+
 ## Тесты
 
 Физика, химия и целостность контента проверяются **71 автотестом** без Unity:

@@ -10,7 +10,25 @@ namespace Elementa.Tests
     static class Program
     {
         static int _pass, _fail;
-        const string DataDir = "../../Assets/Resources/ElementaData";
+        static readonly string DataDir = FindDataDir();
+
+        /// <summary>Finds Assets/Resources/ElementaData whether run from the repo root or the project folder.</summary>
+        static string FindDataDir()
+        {
+            var dir = new DirectoryInfo(Directory.GetCurrentDirectory());
+            for (int i = 0; i < 6 && dir != null; i++, dir = dir.Parent)
+            {
+                var candidate = Path.Combine(dir.FullName, "Assets", "Resources", "ElementaData");
+                if (Directory.Exists(candidate)) return candidate;
+            }
+            dir = new DirectoryInfo(AppContext.BaseDirectory);
+            for (int i = 0; i < 8 && dir != null; i++, dir = dir.Parent)
+            {
+                var candidate = Path.Combine(dir.FullName, "Assets", "Resources", "ElementaData");
+                if (Directory.Exists(candidate)) return candidate;
+            }
+            return "../../Assets/Resources/ElementaData";
+        }
 
         static void Check(string name, bool cond, string detail = "")
         {
