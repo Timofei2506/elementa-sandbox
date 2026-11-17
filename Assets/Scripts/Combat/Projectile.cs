@@ -110,6 +110,10 @@ namespace Elementa
                 ? Game.I.World.ResolveHit(Stats, hit, impactAngle)
                 : new HitOutcome { result = HitResult.Penetrated };
 
+            var sandboxObj = hit.collider.GetComponentInParent<SandboxObject>();
+            if (sandboxObj != null && outcome.result == HitResult.Penetrated && DebrisSystem.IsFragile(sandboxObj.Material))
+                DebrisSystem.Shatter(sandboxObj, hit.point, Stats);
+
             OnHit?.Invoke(this, outcome);
             EffectsSystem.SpawnSparks(hit.point, hit.normal, 6, 4f);
 

@@ -225,6 +225,22 @@ namespace Elementa
             _renderer.SetPropertyBlock(_mpb);
         }
 
+        void OnCollisionEnter(Collision collision)
+        {
+            float speed = collision.relativeVelocity.magnitude;
+            if (speed < 2.5f) return;
+            var other = collision.collider.GetComponentInParent<SandboxObject>();
+            AudioSystem.I?.ImpactFor(Material, Mathf.Clamp01(speed / 12f));
+            if (speed > 7f)
+            {
+                float damage = (speed - 6f) * Mass * 0.35f;
+                if (other != null) other.ApplyDamage(damage);
+                ApplyDamage(damage * 0.5f);
+                EffectsSystem.SpawnSparks(collision.GetContact(0).point, Vector3.up, 4, 2.5f);
+                ScreenShake.Impact(Mathf.Clamp01(speed / 30f));
+            }
+        }
+
         public Vector3 WorldSize => Vector3.Scale(_baseScale, new Vector3(1f, 1f, 1f));
 
         /// <summary>Restores health/temperature from a save file.</summary>

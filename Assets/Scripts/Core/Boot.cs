@@ -46,7 +46,10 @@ namespace Elementa
             game.World = world;
             world.Init();
 
+            PostFX.Attach(rig.Cam);
+
             var ui = UIRoot.Create();
+            PostFX.AddVignette(ui.Canvas);
             game.UI = ui;
 
             AudioSystem.Create(world.transform);
