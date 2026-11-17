@@ -58,6 +58,7 @@ namespace Elementa
             BuildMobileControls();
             Log("ELEMENTA запущена. " + Game.I.LoadedMaterials + " материалов, " + Game.I.LoadedSubstances + " веществ, " + Game.I.LoadedReactions + " реакций.");
             Log("ЛКМ — использовать инструмент, ПКМ — вращать камеру, колесо — зум, WASD — панорама.");
+            if (IsMobileLayout || Screen.width < 1100) ApplyMobileLayout();
         }
 
         // ---------------- top bar ----------------
@@ -248,6 +249,65 @@ namespace Elementa
             Log(text);
         }
 
+        bool _mobileLayoutApplied;
+
+        /// <summary>Reflows the interface once for small/touch screens.</summary>
+        public void ApplyMobileLayout()
+        {
+            if (_mobileLayoutApplied) return;
+            _mobileLayoutApplied = true;
+            IsMobileLayout = true;
+
+            // compact captions so the horizontal sheet fits a phone in portrait
+            var shortNames = new System.Collections.Generic.Dictionary<ToolId, string>
+            {
+                { ToolId.Select, "Кур" }, { ToolId.SpawnMaterial, "Мат" }, { ToolId.SpawnFluid, "Жид" },
+                { ToolId.Shoot, "Огонь?" }, { ToolId.Ignite, "Подж" }, { ToolId.Heat, "Жар" },
+                { ToolId.Hammer, "Мол" }, { ToolId.SpawnNpc, "НПС" }, { ToolId.Delete, "Дел" },
+                { ToolId.TimeControl, "Вр" },
+            };
+            shortNames[ToolId.Shoot] = "Стрел";
+            for (int i = 0; i < ToolbarPanel.childCount; i++)
+            {
+                var child = ToolbarPanel.GetChild(i) as RectTransform;
+                if (child == null) continue;
+                var marker = child.GetComponent<ToolButtonMarker>();
+                var le = child.GetComponent<LayoutElement>();
+                if (le != null) Destroy(le);
+                if (marker == null)
+                {
+                    child.gameObject.SetActive(false);
+                    continue;
+                }
+                child.sizeDelta = new Vector2(54f, 44f);
+                child.anchoredPosition = Vector2.zero;
+                var text = child.GetComponentInChildren<Text>();
+                if (text != null && shortNames.TryGetValue(marker.Tool, out var shortName)) text.text = shortName;
+            }
+
+            // left toolbar becomes a bottom sheet toggled by the mobile bar
+            UIFactory.SetAnchors(ToolbarPanel, new Vector2(0f, 0f), new Vector2(1f, 0f), new Vector2(12f, 62f), new Vector2(-12f, 118f));
+            var vl = ToolbarPanel.GetComponent<VerticalLayoutGroup>();
+            if (vl != null) Destroy(vl);
+            var h = ToolbarPanel.gameObject.GetComponent<HorizontalLayoutGroup>();
+            if (h == null) h = ToolbarPanel.gameObject.AddComponent<HorizontalLayoutGroup>();
+            h.spacing = 4f;
+            h.padding = new RectOffset(6, 6, 6, 6);
+            h.childAlignment = TextAnchor.MiddleCenter;
+            h.childControlWidth = false;
+            h.childControlHeight = true;
+            h.childForceExpandWidth = false;
+            h.childForceExpandHeight = false;
+
+            // catalog becomes a slide-over sheet occupying most of the screen
+            UIFactory.SetAnchors(CatalogPanel, new Vector2(1f, 0f), new Vector2(1f, 1f), new Vector2(-330f, 122f), new Vector2(-10f, -64f));
+
+            // info + console collapse to small strips
+            UIFactory.SetAnchors(InfoPanel, new Vector2(0f, 0f), new Vector2(0f, 0f), new Vector2(10f, 122f), new Vector2(330f, 210f));
+            if (ConsolePanel != null) ConsolePanel.gameObject.SetActive(false);
+            CatalogPanel.gameObject.SetActive(false);
+        }
+
         void Update()
         {
             _frames++;
@@ -272,10 +332,7 @@ namespace Elementa
             }
 
             // hide the catalog when the screen is too narrow for both panels
-            if (Screen.width < 900 && !IsMobileLayout)
-            {
-                IsMobileLayout = true;
-            }
+            if (Screen.width < 900 && !_mobileLayoutApplied) ApplyMobileLayout();
         }
 
         /// <summary>Called by CatalogView when the pointer is over UI so tools do not fire.</summary>

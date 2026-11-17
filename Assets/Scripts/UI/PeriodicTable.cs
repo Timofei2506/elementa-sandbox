@@ -56,8 +56,8 @@ namespace Elementa
             var gridRoot = UIFactory.Box(parent, "Grid", new Vector2(0f, 1f), new Vector2(1f, 1f), new Vector2(4f, -300f), new Vector2(-4f, -4f));
             _grid = gridRoot;
             var glg = gridRoot.gameObject.AddComponent<GridLayoutGroup>();
-            glg.cellSize = new Vector2(20f, 22f);
-            glg.spacing = new Vector2(1.5f, 1.5f);
+            glg.cellSize = new Vector2(17.4f, 19.5f);
+            glg.spacing = new Vector2(1.2f, 1.2f);
             glg.padding = new RectOffset(2, 2, 2, 2);
             glg.constraint = GridLayoutGroup.Constraint.FixedColumnCount;
             glg.constraintCount = 18;
@@ -87,11 +87,11 @@ namespace Elementa
 
         void AddCell(string sym, Dictionary<string, object> data)
         {
-            var cell = UIFactory.Box(_grid, "El_" + sym, Vector2.zero, Vector2.zero, Vector2.zero, new Vector2(20f, 22f), ColorUtil.Hex(Json.Str(data, "color", "#888888")));
+            var cell = UIFactory.Box(_grid, "El_" + sym, Vector2.zero, Vector2.zero, Vector2.zero, new Vector2(17.4f, 19.5f), ColorUtil.Hex(Json.Str(data, "color", "#888888")));
             var image = cell.GetComponent<Image>();
             image.color = Color.Lerp(ColorUtil.Hex(Json.Str(data, "color", "#888888")), new Color(0.08f, 0.09f, 0.11f), 0.45f);
 
-            var label = UIFactory.Label(cell, sym, 9, Theme.Text, TextAnchor.MiddleCenter);
+            var label = UIFactory.Label(cell, sym, 8, Theme.Text, TextAnchor.MiddleCenter);
             UIFactory.SetAnchors((RectTransform)label.transform, Vector2.zero, Vector2.one, Vector2.zero, Vector2.zero);
             label.horizontalOverflow = HorizontalWrapMode.Overflow;
 

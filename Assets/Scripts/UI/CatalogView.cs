@@ -81,6 +81,8 @@ namespace Elementa
             if (table != null) Destroy(table);
             var vl = _list.GetComponent<VerticalLayoutGroup>();
             if (vl != null) vl.enabled = true;
+            var fitter = _list.GetComponent<ContentSizeFitter>();
+            if (fitter != null) fitter.enabled = true;
         }
 
         void Rebuild()
@@ -257,6 +259,9 @@ namespace Elementa
             // the periodic table wants free layout, not the vertical list
             var vl = _list.GetComponent<VerticalLayoutGroup>();
             if (vl != null) vl.enabled = false;
+            var fitter = _list.GetComponent<ContentSizeFitter>();
+            if (fitter != null) fitter.enabled = false;
+            ((RectTransform)_list).anchoredPosition = Vector2.zero;
             view.Build(_list);
             _footer.text = $"{Game.I.Elements.Count} элементов · двойной клик — создать блок";
         }
