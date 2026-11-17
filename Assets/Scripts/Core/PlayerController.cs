@@ -154,10 +154,23 @@ namespace Elementa
             if (Input.GetKeyDown(KeyCode.Alpha0)) SelectTool(ToolId.TimeControl);
             if (Input.GetKeyDown(KeyCode.F1) && Game.I.UI != null) Game.I.UI.ShowHelp();
             if (Input.GetKeyDown(KeyCode.Space)) _world.TimeScale = _world.TimeScale > 0.01f ? 0f : 1f;
+            if (Input.GetKeyDown(KeyCode.Z)) CycleWeapon(-1);
+            if (Input.GetKeyDown(KeyCode.X)) CycleWeapon(1);
             if (Input.GetKeyDown(KeyCode.R)) _world.ResetWorld();
             if (Input.GetKeyDown(KeyCode.Delete) && Selected != null) { Destroy(Selected.gameObject); Selected = null; }
             if (Input.GetKeyDown(KeyCode.Return)) Weapons.Refill();
             if (Input.GetKeyDown(KeyCode.Tab) && Game.I.UI != null) Game.I.UI.ToggleCatalog();
+        }
+
+        /// <summary>Switches to the next/previous weapon in the database.</summary>
+        public void CycleWeapon(int direction)
+        {
+            var all = Game.I.Weapons.All;
+            if (all.Count == 0) return;
+            int idx = Weapons.Current != null ? all.ToList().FindIndex(x => x.id == Weapons.Current.id) : 0;
+            idx = ((idx + direction) % all.Count + all.Count) % all.Count;
+            SetWeapon(all[idx]);
+            Game.I.UI?.Log("Оружие: " + all[idx].nameRu);
         }
 
         void UseTool(Vector3 screenPos, bool firstPress)

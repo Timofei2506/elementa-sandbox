@@ -55,6 +55,7 @@ namespace Elementa
             BuildCatalog();
             BuildInfoPanel();
             BuildConsole();
+            BuildWeaponHud();
             BuildMobileControls();
             Log("ELEMENTA запущена. " + Game.I.LoadedMaterials + " материалов, " + Game.I.LoadedSubstances + " веществ, " + Game.I.LoadedReactions + " реакций.");
             Log("ЛКМ — использовать инструмент, ПКМ — вращать камеру, колесо — зум, WASD — панорама.");
@@ -198,6 +199,15 @@ namespace Elementa
             UIFactory.SetAnchors((RectTransform)ConsoleText.transform, Vector2.zero, Vector2.one, new Vector2(12f, 8f), new Vector2(-12f, -6f));
         }
 
+        Text _weaponText;
+        void BuildWeaponHud()
+        {
+            var panel = UIFactory.Panel(Root, "WeaponHud", Theme.Panel, 12f);
+            UIFactory.SetAnchors(panel, new Vector2(1f, 0f), new Vector2(1f, 0f), new Vector2(-372f, 16f), new Vector2(-14f, 118f));
+            _weaponText = UIFactory.Label(panel, "", Theme.FontSmall, Theme.Text, TextAnchor.UpperLeft);
+            UIFactory.SetAnchors((RectTransform)_weaponText.transform, Vector2.zero, Vector2.one, new Vector2(12f, 8f), new Vector2(-10f, -8f));
+        }
+
         void BuildMobileControls()
         {
             var panel = UIFactory.Box(Root, "MobileBar", new Vector2(0f, 0f), new Vector2(1f, 0f), new Vector2(0f, 0f), new Vector2(0f, 58f), Theme.Bg);
@@ -307,6 +317,9 @@ namespace Elementa
             // info + console collapse to small strips
             UIFactory.SetAnchors(InfoPanel, new Vector2(0f, 0f), new Vector2(0f, 0f), new Vector2(10f, 122f), new Vector2(330f, 210f));
             if (ConsolePanel != null) ConsolePanel.gameObject.SetActive(false);
+            var weaponHud = Root.Find("WeaponHud") as RectTransform;
+            if (weaponHud != null)
+                UIFactory.SetAnchors(weaponHud, new Vector2(1f, 0f), new Vector2(1f, 0f), new Vector2(-330f, 66f), new Vector2(-10f, 160f));
             CatalogPanel.gameObject.SetActive(false);
         }
 
@@ -353,6 +366,23 @@ namespace Elementa
             if (pc != null && SelectionText != null)
             {
                 SelectionText.text = pc.SelectionDescription;
+            }
+            if (pc != null && _weaponText != null)
+            {
+                var weapon = pc.Weapons != null ? pc.Weapons.Current : null;
+                if (weapon == null)
+                {
+                    _weaponText.text = "<b>Инструмент</b>\n" + PlayerController.ToolName(pc.CurrentTool);
+                }
+                else
+                {
+                    var st = weapon.Stats;
+                    string ammo = weapon.automatic || weapon.magSize > 1 ? $"{pc.Weapons.Ammo}/{weapon.magSize:F0}" : "—";
+                    _weaponText.text = $"<b>{weapon.nameRu}</b>\n" +
+                                       $"КЭ {st.energyJ:F0} Дж · {weapon.velocity:F0} м/с\n" +
+                                       $"Пробитие ~{st.penetrationMM:F0} мм RHA\n" +
+                                       $"Патроны {ammo} · {PlayerController.ToolName(pc.CurrentTool)}";
+                }
             }
 
             // hide the catalog when the screen is too narrow for both panels
