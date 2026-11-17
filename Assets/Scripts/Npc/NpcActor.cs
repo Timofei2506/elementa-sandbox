@@ -117,9 +117,9 @@ namespace Elementa
         void PickWander()
         {
             _wanderTarget = new Vector3(
-                UnityEngine.Random.Range(-WorldEnvironment.ArenaHalfSize * 0.8f, WorldEnvironment.ArenaHalfSize * 0.8f),
+                UnityEngine.Random.Range(-WorldEnvironment.ArenaHalfSize * 0.78f, WorldEnvironment.ArenaHalfSize * 0.78f),
                 transform.position.y,
-                UnityEngine.Random.Range(-WorldEnvironment.ArenaHalfSize * 0.8f, WorldEnvironment.ArenaHalfSize * 0.8f));
+                UnityEngine.Random.Range(-WorldEnvironment.ArenaHalfSize * 0.78f, WorldEnvironment.ArenaHalfSize * 0.78f));
             _wanderTimer = UnityEngine.Random.Range(3f, 7f);
         }
 

@@ -59,6 +59,7 @@ namespace Elementa
             Log("ELEMENTA запущена. " + Game.I.LoadedMaterials + " материалов, " + Game.I.LoadedSubstances + " веществ, " + Game.I.LoadedReactions + " реакций.");
             Log("ЛКМ — использовать инструмент, ПКМ — вращать камеру, колесо — зум, WASD — панорама.");
             if (IsMobileLayout || Screen.width < 1100) ApplyMobileLayout();
+            if (IsMobileLayout) BuildMobileToolStrip();
         }
 
         // ---------------- top bar ----------------
@@ -285,8 +286,9 @@ namespace Elementa
                 if (text != null && shortNames.TryGetValue(marker.Tool, out var shortName)) text.text = shortName;
             }
 
-            // left toolbar becomes a bottom sheet toggled by the mobile bar
+            // left toolbar is replaced by the icon strip; keep it hidden by default
             UIFactory.SetAnchors(ToolbarPanel, new Vector2(0f, 0f), new Vector2(1f, 0f), new Vector2(12f, 62f), new Vector2(-12f, 118f));
+            ToolbarPanel.gameObject.SetActive(false);
             var vl = ToolbarPanel.GetComponent<VerticalLayoutGroup>();
             if (vl != null) Destroy(vl);
             var h = ToolbarPanel.gameObject.GetComponent<HorizontalLayoutGroup>();
@@ -306,6 +308,28 @@ namespace Elementa
             UIFactory.SetAnchors(InfoPanel, new Vector2(0f, 0f), new Vector2(0f, 0f), new Vector2(10f, 122f), new Vector2(330f, 210f));
             if (ConsolePanel != null) ConsolePanel.gameObject.SetActive(false);
             CatalogPanel.gameObject.SetActive(false);
+        }
+
+        /// <summary>Vertical icon strip for phones: one icon per tool, no text.</summary>
+        void BuildMobileToolStrip()
+        {
+            var strip = UIFactory.Box(Root, "MobileToolStrip", new Vector2(0f, 0f), new Vector2(0f, 1f), new Vector2(8f, 190f), new Vector2(64f, -70f));
+            var v = UIFactory.VLayout((RectTransform)strip, 4f, new RectOffset(4, 4, 6, 6));
+            v.childAlignment = TextAnchor.UpperCenter;
+            var icons = new (string, ToolId)[]
+            {
+                ("◈", ToolId.Select), ("▣", ToolId.SpawnMaterial), ("◍", ToolId.SpawnFluid),
+                ("➤", ToolId.Shoot), ("✷", ToolId.Ignite), ("♨", ToolId.Heat),
+                ("⚒", ToolId.Hammer), ("☺", ToolId.SpawnNpc), ("✖", ToolId.Delete), ("◷", ToolId.TimeControl),
+            };
+            foreach (var (icon, tool) in icons)
+            {
+                var t = tool;
+                var btn = UIFactory.Button(strip, icon, new Vector2(48f, 48f), () => Game.I.World.GetComponent<PlayerController>().SelectTool(t), Theme.Card, 22);
+                btn.gameObject.AddComponent<LayoutElement>().preferredHeight = 48f;
+                var marker = btn.gameObject.AddComponent<ToolButtonMarker>();
+                marker.Tool = t;
+            }
         }
 
         void Update()

@@ -210,11 +210,23 @@ namespace Elementa
             Spawn("ceramic_alumina", BodyShape.Plate, new Vector3(1.6f, 2f, 0.35f), new Vector3(1f, 1.2f, 4f));
             Spawn("glass", BodyShape.Plate, new Vector3(2.5f, 2.5f, 0.15f), new Vector3(4.5f, 1.4f, 3f));
 
+            Spawn("steel_1045", BodyShape.Cylinder, new Vector3(0.9f, 1.2f, 0.9f), new Vector3(5f, 1.1f, -1.5f));
+            Spawn("titanium", BodyShape.Box, new Vector3(1.1f, 1.1f, 1.1f), new Vector3(-4.5f, 1.0f, -4.5f));
+            Spawn("brick", BodyShape.Plate, new Vector3(3f, 0.4f, 3f), new Vector3(0f, 0.65f, -1.5f));
+
             var beaker = SpawnContainer(new Vector3(-3.4f, 0.9f, 3.2f), 6f);
             beaker.Fill("water", 2.0f);
+            var acidFlask = SpawnContainer(new Vector3(-1.6f, 0.9f, 3.6f), 5f);
+            acidFlask.Fill("hcl", 1.5f);
+            var baseFlask = SpawnContainer(new Vector3(0.1f, 0.9f, 3.6f), 5f);
+            baseFlask.Fill("naoh", 1.5f);
+            var fuelBarrel = SpawnContainer(new Vector3(1.8f, 0.9f, 3.6f), 8f);
+            fuelBarrel.Fill("gasoline", 3.0f);
 
             var npc = SpawnNpc(new Vector3(3.5f, 1.2f, -2.5f));
             npc.SetBehaviour(NpcActor.Behaviour.Idle);
+            var npc2 = SpawnNpc(new Vector3(-3.5f, 1.2f, -2.5f), NpcActor.NpcKind.Scientist);
+            npc2.SetBehaviour(NpcActor.Behaviour.Wander);
         }
 
         void LateUpdate()
