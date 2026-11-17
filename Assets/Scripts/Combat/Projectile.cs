@@ -116,6 +116,7 @@ namespace Elementa
 
             OnHit?.Invoke(this, outcome);
             EffectsSystem.SpawnSparks(hit.point, hit.normal, 6, 4f);
+            EffectsSystem.SpawnDecal(hit.point, hit.normal, Mathf.Clamp(Stats.caliberMM * 0.006f, 0.05f, 0.22f));
 
             if (Stats.kind == ProjectileKind.Laser)
             {

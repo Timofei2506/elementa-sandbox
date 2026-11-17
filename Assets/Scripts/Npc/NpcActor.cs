@@ -123,8 +123,51 @@ namespace Elementa
             _wanderTimer = UnityEngine.Random.Range(3f, 7f);
         }
 
+        Transform _barBg, _barFill;
+        void EnsureHealthBar()
+        {
+            if (_barBg != null) return;
+            var canvasGo = new GameObject("HealthBar", typeof(Canvas));
+            canvasGo.transform.SetParent(transform, false);
+            var canvas = canvasGo.GetComponent<Canvas>();
+            canvas.renderMode = RenderMode.WorldSpace;
+            var rt = (RectTransform)canvasGo.transform;
+            rt.sizeDelta = new Vector2(120f, 18f);
+            rt.localPosition = new Vector3(0f, 2.35f, 0f);
+            rt.localScale = Vector3.one * 0.012f;
+
+            var bg = new GameObject("Bg", typeof(RectTransform));
+            bg.transform.SetParent(canvasGo.transform, false);
+            UIFactory.SetAnchors((RectTransform)bg.transform, Vector2.zero, Vector2.one, Vector2.zero, Vector2.zero);
+            var bgImg = bg.AddComponent<UnityEngine.UI.Image>();
+            bgImg.color = new Color(0.05f, 0.06f, 0.08f, 0.85f);
+
+            var fill = new GameObject("Fill", typeof(RectTransform));
+            fill.transform.SetParent(bg.transform, false);
+            UIFactory.SetAnchors((RectTransform)fill.transform, Vector2.zero, Vector2.one, new Vector2(2f, 2f), new Vector2(-2f, -2f));
+            var fillImg = fill.AddComponent<UnityEngine.UI.Image>();
+            fillImg.color = Theme.Accent;
+            fillImg.sprite = RuntimeVisuals.Rounded(32, 8);
+            fillImg.type = UnityEngine.UI.Image.Type.Filled;
+            fillImg.fillMethod = UnityEngine.UI.Image.FillMethod.Horizontal;
+            _barBg = bg.transform;
+            _barFill = fill.transform;
+        }
+
+        void UpdateHealthBar()
+        {
+            EnsureHealthBar();
+            if (_barFill == null) return;
+            float ratio = Mathf.Clamp01(Health / Mathf.Max(1f, MaxHealth));
+            var img = _barFill.GetComponent<UnityEngine.UI.Image>();
+            img.fillAmount = ratio;
+            img.color = ratio > 0.6f ? Theme.Accent : ratio > 0.3f ? Theme.Warn : Theme.Danger;
+            _barBg.parent.rotation = Camera.main != null ? Camera.main.transform.rotation : Quaternion.identity;
+        }
+
         void Update()
         {
+            UpdateHealthBar();
             if (IsDead) return;
             float dt = Time.deltaTime;
 

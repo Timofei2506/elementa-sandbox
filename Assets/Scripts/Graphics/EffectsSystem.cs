@@ -143,6 +143,30 @@ namespace Elementa
             ps.Play();
         }
 
+        /// <summary>Adds a cheap impact decal (bullet hole) on a surface.</summary>
+        public static void SpawnDecal(Vector3 position, Vector3 normal, float size = 0.09f, Color? tint = null)
+        {
+            if (I == null) return;
+            if (I._decals.Count > 160) return;
+            var go = GameObject.CreatePrimitive(PrimitiveType.Quad);
+            go.name = "Decal";
+            Destroy(go.GetComponent<Collider>());
+            go.transform.SetParent(I._root, false);
+            go.transform.position = position + normal * 0.006f;
+            go.transform.rotation = Quaternion.LookRotation(-normal);
+            go.transform.localScale = Vector3.one * size;
+            var mr = go.GetComponent<MeshRenderer>();
+            var mat = new Material(RuntimeVisuals.Standard) { name = "ELEMENTA_Decal" };
+            Color c = tint ?? new Color(0.06f, 0.06f, 0.07f);
+            mat.color = c;
+            if (mat.HasProperty("_Glossiness")) mat.SetFloat("_Glossiness", 0.15f);
+            mr.sharedMaterial = mat;
+            mr.shadowCastingMode = UnityEngine.Rendering.ShadowCastingMode.Off;
+            I._decals.Add(go);
+            go.AddComponent<DecalFade>();
+        }
+        readonly List<GameObject> _decals = new List<GameObject>();
+
         public static void SpawnExplosion(Vector3 position, float power)
         {
             if (I == null) return;
@@ -235,9 +259,34 @@ namespace Elementa
             for (int i = I._root.childCount - 1; i >= 0; i--)
                 Destroy(I._root.GetChild(i).gameObject);
             I._fires.Clear();
+            I._decals.Clear();
             I._smokePool.Clear();
             I._sparkPool.Clear();
             I._fluidPool.Clear();
+        }
+    }
+
+    /// <summary>Fades a decal out over time and removes it.</summary>
+    public class DecalFade : MonoBehaviour
+    {
+        float _age;
+        const float Life = 60f;
+        Renderer _r;
+        void Start() => _r = GetComponent<Renderer>();
+        void Update()
+        {
+            _age += Time.deltaTime;
+            if (_r != null && _age > Life * 0.7f)
+            {
+                var mb = new MaterialPropertyBlock();
+                var baseColor = _r.sharedMaterial.color;
+                baseColor.a = Mathf.Clamp01(1f - (_age - Life * 0.7f) / (Life * 0.3f));
+                Vector3 scale = transform.localScale;
+                transform.localScale = scale;
+                mb.SetColor("_Color", baseColor);
+                _r.SetPropertyBlock(mb);
+            }
+            if (_age > Life) Destroy(gameObject);
         }
     }
 
