@@ -1,0 +1,265 @@
+using System;
+using System.Collections.Generic;
+using System.Text;
+using Elementa.Sim;
+using UnityEngine;
+using UnityEngine.UI;
+
+namespace Elementa
+{
+    /// <summary>
+    /// Root of the in-game interface. Builds the HUD, toolbar, catalog and info panels,
+    /// and reflows them for desktop (mouse + keyboard) or mobile (touch).
+    /// </summary>
+    public class UIRoot : MonoBehaviour
+    {
+        public Canvas Canvas { get; private set; }
+        public RectTransform Root { get; private set; }
+        public bool BlocksCameraInput { get; private set; }
+        public bool IsMobileLayout { get; private set; }
+
+        public RectTransform CatalogPanel { get; private set; }
+        public RectTransform ToolbarPanel { get; private set; }
+        public RectTransform InfoPanel { get; private set; }
+        public RectTransform ConsolePanel { get; private set; }
+        public Text ConsoleText { get; private set; }
+        public Text StatusText { get; private set; }
+        public Text SelectionText { get; private set; }
+        public Text FpsText { get; private set; }
+        public Text TopTitle { get; private set; }
+
+        readonly List<GameObject> _desktopOnly = new List<GameObject>();
+        readonly StringBuilder _log = new StringBuilder();
+        float _fpsTimer;
+        int _frames;
+        bool _catalogOpen = true;
+
+        public static UIRoot Create()
+        {
+            var go = new GameObject("UI");
+            var canvas = UIFactory.CreateCanvas("ELEMENTA_Canvas", 100);
+            go.transform.SetParent(canvas.transform, false);
+            var ui = go.AddComponent<UIRoot>();
+            ui.Canvas = canvas;
+            ui.Root = (RectTransform)go.transform;
+            UIFactory.SetAnchors(ui.Root, Vector2.zero, Vector2.one, Vector2.zero, Vector2.zero);
+            ui.Build();
+            return ui;
+        }
+
+        void Build()
+        {
+            IsMobileLayout = Game.I != null && Game.I.IsMobile;
+            BuildTopBar();
+            BuildToolbar();
+            BuildCatalog();
+            BuildInfoPanel();
+            BuildConsole();
+            BuildMobileControls();
+            Log("ELEMENTA запущена. " + Game.I.LoadedMaterials + " материалов, " + Game.I.LoadedSubstances + " веществ, " + Game.I.LoadedReactions + " реакций.");
+            Log("ЛКМ — использовать инструмент, ПКМ — вращать камеру, колесо — зум, WASD — панорама.");
+        }
+
+        // ---------------- top bar ----------------
+        void BuildTopBar()
+        {
+            var bar = UIFactory.Box(Root, "TopBar", new Vector2(0f, 1f), new Vector2(1f, 1f), new Vector2(0f, -58f), Vector2.zero, Theme.Bg);
+            var title = UIFactory.Label(bar, "ELEMENTA", Theme.FontTitle, Theme.Accent, TextAnchor.MiddleLeft, FontStyle.Bold);
+            UIFactory.SetAnchors((RectTransform)title.transform, new Vector2(0f, 0f), new Vector2(0f, 1f), new Vector2(22f, 0f), new Vector2(240f, 0f));
+            TopTitle = title;
+
+            var sub = UIFactory.Label(bar, "физика · химия · оружие", Theme.FontSmall, Theme.TextDim);
+            UIFactory.SetAnchors((RectTransform)sub.transform, new Vector2(0f, 0f), new Vector2(0f, 1f), new Vector2(150f, 0f), new Vector2(420f, 0f));
+            _desktopOnly.Add(sub.gameObject);
+
+            FpsText = UIFactory.Label(bar, "60 FPS", Theme.FontSmall, Theme.TextDim, TextAnchor.MiddleRight);
+            UIFactory.SetAnchors((RectTransform)FpsText.transform, new Vector2(1f, 0f), new Vector2(1f, 1f), new Vector2(-460f, 0f), new Vector2(-16f, 0f));
+
+            StatusText = UIFactory.Label(bar, "", Theme.FontSmall, Theme.TextDim, TextAnchor.MiddleRight);
+            UIFactory.SetAnchors((RectTransform)StatusText.transform, new Vector2(1f, 0f), new Vector2(1f, 1f), new Vector2(-360f, 0f), new Vector2(-80f, 0f));
+
+            float x = 260f;
+            AddTopButton(bar, "Пауза", ref x, () => TogglePause());
+            AddTopButton(bar, "Сброс", ref x, () => { Game.I.World.ResetWorld(); Log("Мир сброшен."); });
+            AddTopButton(bar, "Очистить", ref x, () => { Game.I.World.ClearAll(); Log("Сцена очищена."); });
+            AddTopButton(bar, "Гравитация", ref x, () => { var w = Game.I.World; w.SetGravity(!w.GravityEnabled); Log("Гравитация: " + (w.GravityEnabled ? "вкл" : "выкл")); });
+            AddTopButton(bar, "Каталог", ref x, () => ToggleCatalog());
+        }
+
+        void AddTopButton(RectTransform bar, string caption, ref float x, Action action)
+        {
+            var btn = UIFactory.Button(bar, caption, new Vector2(96f, 34f), action, Theme.PanelLight, Theme.FontSmall);
+            var rt = (RectTransform)btn.transform;
+            rt.anchorMin = new Vector2(0f, 0.5f);
+            rt.anchorMax = new Vector2(0f, 0.5f);
+            rt.anchoredPosition = new Vector2(x + 48f, 0f);
+            x += 102f;
+        }
+
+        // ---------------- toolbar ----------------
+        void BuildToolbar()
+        {
+            var panel = UIFactory.Panel(Root, "Toolbar", Theme.Panel, 14f);
+            UIFactory.SetAnchors(panel, new Vector2(0f, 0.5f), new Vector2(0f, 0.5f), new Vector2(14f, -250f), new Vector2(96f, 250f));
+            ToolbarPanel = panel;
+
+            var v = UIFactory.VLayout(panel, 6f, new RectOffset(6, 6, 10, 10));
+            v.childAlignment = TextAnchor.UpperCenter;
+
+            var header = UIFactory.Label(panel, "ИНСТРУМЕНТ", Theme.FontTiny, Theme.TextDim, TextAnchor.MiddleCenter);
+            header.gameObject.AddComponent<LayoutElement>().preferredHeight = 18f;
+
+            var tools = new (string, ToolId, string)[]
+            {
+                ("Курсор", ToolId.Select, "Выбор и перетаскивание объектов"),
+                ("Материал", ToolId.SpawnMaterial, "Создать объект из материала"),
+                ("Жидкость", ToolId.SpawnFluid, "Налить вещество в контейнер"),
+                ("Оружие", ToolId.Shoot, "Стрельба выбранным оружием"),
+                ("Огонь", ToolId.Ignite, "Поджечь объект"),
+                ("Жар", ToolId.Heat, "Нагреть/охладить объект"),
+                ("Молот", ToolId.Hammer, "Нанести физический удар"),
+                ("НПС", ToolId.SpawnNpc, "Создать персонажа"),
+                ("Разрушить", ToolId.Delete, "Удалить объект"),
+                ("Время", ToolId.TimeControl, "Замедление времени"),
+            };
+
+            foreach (var (caption, id, tip) in tools)
+            {
+                var btn = UIFactory.Button(panel, caption, new Vector2(74f, 40f), () => Game.I.World.GetComponent<PlayerController>().SelectTool(id), Theme.Card, Theme.FontSmall);
+                var le = btn.gameObject.AddComponent<LayoutElement>();
+                le.preferredHeight = 40f;
+                btn.gameObject.AddComponent<ToolButtonMarker>().Tool = id;
+                var tipGo = btn.gameObject.AddComponent<SimpleTooltip>();
+                tipGo.Text = tip;
+            }
+        }
+
+        // ---------------- catalog ----------------
+        void BuildCatalog()
+        {
+            var panel = UIFactory.Panel(Root, "Catalog", Theme.Panel, 14f);
+            UIFactory.SetAnchors(panel, new Vector2(1f, 0f), new Vector2(1f, 1f), new Vector2(-360f, 62f), new Vector2(-14f, -70f));
+            CatalogPanel = panel;
+            var catalog = panel.gameObject.AddComponent<CatalogView>();
+            catalog.Build(this, panel);
+        }
+
+        // ---------------- info panel ----------------
+        void BuildInfoPanel()
+        {
+            var panel = UIFactory.Panel(Root, "Info", Theme.Panel, 12f);
+            UIFactory.SetAnchors(panel, new Vector2(0f, 0f), new Vector2(0f, 0f), new Vector2(14f, 62f), new Vector2(420f, 190f));
+            InfoPanel = panel;
+            var label = UIFactory.Label(panel, "Ничего не выбрано.\nНаведите курсор и нажмите ЛКМ", Theme.FontSmall, Theme.TextDim, TextAnchor.UpperLeft);
+            UIFactory.SetAnchors((RectTransform)label.transform, Vector2.zero, Vector2.one, new Vector2(12f, 10f), new Vector2(-10f, -8f));
+            SelectionText = label;
+        }
+
+        void BuildConsole()
+        {
+            var panel = UIFactory.Panel(Root, "Console", Theme.Bg, 12f);
+            UIFactory.SetAnchors(panel, new Vector2(0f, 0f), new Vector2(1f, 0f), new Vector2(432f, 16f), new Vector2(-378f, 130f));
+            ConsolePanel = panel;
+            ConsoleText = UIFactory.Label(panel, "", Theme.FontSmall, Theme.TextDim, TextAnchor.LowerLeft);
+            UIFactory.SetAnchors((RectTransform)ConsoleText.transform, Vector2.zero, Vector2.one, new Vector2(12f, 8f), new Vector2(-12f, -6f));
+        }
+
+        void BuildMobileControls()
+        {
+            var panel = UIFactory.Box(Root, "MobileBar", new Vector2(0f, 0f), new Vector2(1f, 0f), new Vector2(0f, 0f), new Vector2(0f, 58f), Theme.Bg);
+            var h = UIFactory.HLayout(panel, 8f, new RectOffset(12, 12, 9, 9));
+            h.childAlignment = TextAnchor.MiddleCenter;
+            foreach (var (caption, action) in new (string, Action)[]
+            {
+                ("Инструменты", () => ToggleToolbar()),
+                ("Каталог", () => ToggleCatalog()),
+                ("Огонь", () => Game.I.World.GetComponent<PlayerController>().SelectTool(ToolId.Ignite)),
+                ("Оружие", () => Game.I.World.GetComponent<PlayerController>().SelectTool(ToolId.Shoot)),
+                ("Камера", () => Game.I.CameraRig.ResetView()),
+                ("Пауза", () => TogglePause()),
+            })
+            {
+                var b = UIFactory.Button(panel, caption, new Vector2(0f, 40f), action, Theme.PanelLight, Theme.FontSmall);
+                b.gameObject.AddComponent<LayoutElement>().preferredWidth = 118f;
+            }
+            panel.gameObject.SetActive(IsMobileLayout);
+        }
+
+        public void ToggleCatalog()
+        {
+            _catalogOpen = !_catalogOpen;
+            CatalogPanel.gameObject.SetActive(_catalogOpen);
+        }
+
+        public void ToggleToolbar()
+        {
+            ToolbarPanel.gameObject.SetActive(!ToolbarPanel.gameObject.activeSelf);
+        }
+
+        void TogglePause()
+        {
+            var w = Game.I.World;
+            w.TimeScale = w.TimeScale > 0.01f ? 0f : 1f;
+            Log(w.TimeScale > 0.01f ? "Симуляция продолжена." : "Симуляция на паузе.");
+        }
+
+        public void Log(string message)
+        {
+            string line = "› " + message + "\n";
+            _log.Append(line);
+            if (_log.Length > 1200) _log.Remove(0, _log.Length - 1200);
+            if (ConsoleText != null) ConsoleText.text = _log.ToString();
+        }
+
+        public void ReportReaction(string text)
+        {
+            Log(text);
+        }
+
+        void Update()
+        {
+            _frames++;
+            _fpsTimer += Time.unscaledDeltaTime;
+            if (_fpsTimer >= 0.5f)
+            {
+                float fps = _frames / _fpsTimer;
+                _frames = 0; _fpsTimer = 0f;
+                if (FpsText != null) FpsText.text = $"{fps:F0} FPS";
+            }
+
+            var w = Game.I.World;
+            if (w != null && StatusText != null)
+            {
+                StatusText.text = $"{w.Objects.Count} объектов · {w.Npcs.Count} NPC · x{w.TimeScale:0.##}";
+            }
+
+            var pc = w != null ? w.GetComponent<PlayerController>() : null;
+            if (pc != null && SelectionText != null)
+            {
+                SelectionText.text = pc.SelectionDescription;
+            }
+
+            // hide the catalog when the screen is too narrow for both panels
+            if (Screen.width < 900 && !IsMobileLayout)
+            {
+                IsMobileLayout = true;
+            }
+        }
+
+        /// <summary>Called by CatalogView when the pointer is over UI so tools do not fire.</summary>
+        public void SetPointerOverUI(bool over)
+        {
+            BlocksCameraInput = over;
+        }
+    }
+
+    public class ToolButtonMarker : MonoBehaviour
+    {
+        public ToolId Tool;
+    }
+
+    public class SimpleTooltip : MonoBehaviour
+    {
+        public string Text;
+    }
+}

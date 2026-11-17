@@ -1,0 +1,707 @@
+{
+ "reactions": [
+  {
+   "id": "neutralization_hcl_naoh",
+   "ru": "Нейтрализация HCl + NaOH",
+   "reactants": {
+    "hcl": 1,
+    "naoh": 1
+   },
+   "products": {
+    "water": 1,
+    "salt": 1
+   },
+   "dh": -57.3,
+   "temp": 273,
+   "catalyst": null,
+   "rate": 0.9,
+   "effects": {
+    "heat": 1
+   }
+  },
+  {
+   "id": "neutralization_sulf_naoh",
+   "ru": "Нейтрализация H2SO4 + NaOH",
+   "reactants": {
+    "sulfuric": 1,
+    "naoh": 2
+   },
+   "products": {
+    "water": 2,
+    "salt": 1
+   },
+   "dh": -114,
+   "temp": 273,
+   "catalyst": null,
+   "rate": 0.8,
+   "effects": {
+    "heat": 1
+   }
+  },
+  {
+   "id": "acid_carbonate",
+   "ru": "Кислота + сода",
+   "reactants": {
+    "hcl": 1,
+    "sodium_bicarbonate": 1
+   },
+   "products": {
+    "salt": 1,
+    "water": 1,
+    "co2": 1
+   },
+   "dh": -25,
+   "temp": 273,
+   "catalyst": null,
+   "rate": 1.0,
+   "effects": {
+    "gas": "co2",
+    "fizz": 1
+   }
+  },
+  {
+   "id": "acid_metal",
+   "ru": "Кислота + металл",
+   "reactants": {
+    "hcl": 2,
+    "magnesium_powder": 1
+   },
+   "products": {
+    "hydrogen": 1
+   },
+   "dh": -462,
+   "temp": 273,
+   "catalyst": null,
+   "rate": 0.35,
+   "effects": {
+    "gas": "hydrogen",
+    "fizz": 1,
+    "heat": 0.2
+   }
+  },
+  {
+   "id": "thermite_ignite",
+   "ru": "Горение термита",
+   "reactants": {
+    "thermite": 1
+   },
+   "products": {
+    "molten_steel": 1,
+    "iron_oxide": 0
+   },
+   "dh": -850,
+   "temp": 900,
+   "catalyst": null,
+   "rate": 0.25,
+   "effects": {
+    "heat": 1,
+    "molten": 1,
+    "sparks": 1,
+    "light": 1
+   }
+  },
+  {
+   "id": "black_powder_burn",
+   "ru": "Взрыв пороха",
+   "reactants": {
+    "black_powder": 1
+   },
+   "products": {
+    "co2": 1,
+    "nitrogen": 1,
+    "carbon_powder": 0.2
+   },
+   "dh": -2900,
+   "temp": 450,
+   "catalyst": null,
+   "rate": 4.0,
+   "effects": {
+    "explosion": 1.0,
+    "gas": "co2",
+    "smoke": 1
+   }
+  },
+  {
+   "id": "tnt_detonate",
+   "ru": "Детонация тротила",
+   "reactants": {
+    "tnt": 1
+   },
+   "products": {
+    "co2": 3.5,
+    "nitrogen": 1.5,
+    "carbon_powder": 2
+   },
+   "dh": -4200,
+   "temp": 500,
+   "catalyst": null,
+   "rate": 8.0,
+   "effects": {
+    "explosion": 1.6,
+    "smoke": 1,
+    "shockwave": 1
+   }
+  },
+  {
+   "id": "nitroglycerin_detonate",
+   "ru": "Детонация нитроглицерина",
+   "reactants": {
+    "glycerin_dynamite": 1
+   },
+   "products": {
+    "co2": 3,
+    "nitrogen": 1.5,
+    "water": 2.5,
+    "oxygen": 0.25
+   },
+   "dh": -5900,
+   "temp": 420,
+   "catalyst": null,
+   "rate": 10.0,
+   "effects": {
+    "explosion": 2.0,
+    "smoke": 1,
+    "shockwave": 1
+   }
+  },
+  {
+   "id": "flash_burn",
+   "ru": "Вспышка",
+   "reactants": {
+    "flash_powder": 1
+   },
+   "products": {
+    "oxygen": 0.5
+   },
+   "dh": -5100,
+   "temp": 600,
+   "catalyst": null,
+   "rate": 9.0,
+   "effects": {
+    "explosion": 0.6,
+    "flash": 1,
+    "light": 1
+   }
+  },
+  {
+   "id": "gasoline_burn",
+   "ru": "Горение бензина",
+   "reactants": {
+    "gasoline": 1,
+    "oxygen": 12.5
+   },
+   "products": {
+    "co2": 8,
+    "water": 9
+   },
+   "dh": -5470,
+   "temp": 280,
+   "catalyst": null,
+   "rate": 0.9,
+   "effects": {
+    "fire": 1,
+    "heat": 1,
+    "smoke": 1
+   }
+  },
+  {
+   "id": "ethanol_burn",
+   "ru": "Горение этанола",
+   "reactants": {
+    "ethanol": 1,
+    "oxygen": 3
+   },
+   "products": {
+    "co2": 2,
+    "water": 3
+   },
+   "dh": -1367,
+   "temp": 363,
+   "catalyst": null,
+   "rate": 0.8,
+   "effects": {
+    "fire": 1,
+    "heat": 0.8
+   }
+  },
+  {
+   "id": "hydrogen_burn",
+   "ru": "Горение водорода",
+   "reactants": {
+    "hydrogen": 2,
+    "oxygen": 1
+   },
+   "products": {
+    "water": 2
+   },
+   "dh": -572,
+   "temp": 793,
+   "catalyst": null,
+   "rate": 6.0,
+   "effects": {
+    "explosion": 0.8,
+    "flash": 1,
+    "heat": 1
+   }
+  },
+  {
+   "id": "methane_style_co_burn",
+   "ru": "Горение угарного газа",
+   "reactants": {
+    "co": 2,
+    "oxygen": 1
+   },
+   "products": {
+    "co2": 2
+   },
+   "dh": -566,
+   "temp": 882,
+   "catalyst": null,
+   "rate": 2.5,
+   "effects": {
+    "fire": 0.5,
+    "heat": 0.7
+   }
+  },
+  {
+   "id": "h2s_burn",
+   "ru": "Горение сероводорода",
+   "reactants": {
+    "hydrogen_sulfide": 2,
+    "oxygen": 3
+   },
+   "products": {
+    "so2": 2,
+    "water": 2
+   },
+   "dh": -1036,
+   "temp": 573,
+   "catalyst": null,
+   "rate": 2.0,
+   "effects": {
+    "fire": 1,
+    "heat": 0.8,
+    "gas": "so2"
+   }
+  },
+  {
+   "id": "sulfur_burn",
+   "ru": "Горение серы",
+   "reactants": {
+    "sulfur_powder": 1,
+    "oxygen": 1
+   },
+   "products": {
+    "so2": 1
+   },
+   "dh": -297,
+   "temp": 505,
+   "catalyst": null,
+   "rate": 0.6,
+   "effects": {
+    "fire": 1,
+    "smoke": 1,
+    "gas": "so2"
+   }
+  },
+  {
+   "id": "magnesium_burn",
+   "ru": "Горение магния",
+   "reactants": {
+    "magnesium_powder": 2,
+    "oxygen": 1
+   },
+   "products": {
+    "carbon_powder": 0
+   },
+   "dh": -1204,
+   "temp": 633,
+   "catalyst": null,
+   "rate": 1.2,
+   "effects": {
+    "light": 1,
+    "heat": 1,
+    "fire": 1
+   }
+  },
+  {
+   "id": "aluminium_burn",
+   "ru": "Горение алюминия",
+   "reactants": {
+    "aluminium_powder": 4,
+    "oxygen": 3
+   },
+   "products": {
+    "iron_oxide": 0
+   },
+   "dh": -3352,
+   "temp": 700,
+   "catalyst": null,
+   "rate": 0.9,
+   "effects": {
+    "light": 1,
+    "heat": 1,
+    "fire": 1
+   }
+  },
+  {
+   "id": "carbide_water",
+   "ru": "Карбид + вода",
+   "reactants": {
+    "calcium_carbide": 1,
+    "water": 2
+   },
+   "products": {
+    "quicklime": 1
+   },
+   "dh": -130,
+   "temp": 273,
+   "catalyst": null,
+   "rate": 1.2,
+   "effects": {
+    "gas": "acetylene",
+    "fizz": 1,
+    "heat": 1
+   }
+  },
+  {
+   "id": "peroxide_decompose",
+   "ru": "Разложение перекиси",
+   "reactants": {
+    "hydrogen_peroxide": 2
+   },
+   "products": {
+    "water": 2,
+    "oxygen": 1
+   },
+   "dh": -196,
+   "temp": 273,
+   "catalyst": "potassium_permanganate",
+   "rate": 1.5,
+   "effects": {
+    "gas": "oxygen",
+    "fizz": 1,
+    "heat": 0.5
+   }
+  },
+  {
+   "id": "acid_limestone",
+   "ru": "Кислота + известь",
+   "reactants": {
+    "hcl": 2,
+    "quicklime": 1
+   },
+   "products": {
+    "water": 1
+   },
+   "dh": -195,
+   "temp": 273,
+   "catalyst": null,
+   "rate": 0.9,
+   "effects": {
+    "heat": 1
+   }
+  },
+  {
+   "id": "copper_sulfate_iron",
+   "ru": "Медь + железо (замещение)",
+   "reactants": {
+    "copper_sulfate": 1,
+    "iron_oxide": 0
+   },
+   "products": {
+    "silver_nitrate": 0
+   },
+   "dh": -150,
+   "temp": 273,
+   "catalyst": null,
+   "rate": 0.2,
+   "effects": {
+    "color_shift": 1
+   }
+  },
+  {
+   "id": "silver_chloride",
+   "ru": "AgNO3 + Cl",
+   "reactants": {
+    "silver_nitrate": 1,
+    "salt": 1
+   },
+   "products": {
+    "water": 0
+   },
+   "dh": -65,
+   "temp": 273,
+   "catalyst": null,
+   "rate": 1.0,
+   "effects": {
+    "precipitate": "AgCl",
+    "color_shift": 1
+   }
+  },
+  {
+   "id": "ammonium_nitrate_decomp",
+   "ru": "Разложение селитры",
+   "reactants": {
+    "ammonium_nitrate": 1
+   },
+   "products": {
+    "nitrous_oxide": 1,
+    "water": 2
+   },
+   "dh": -37,
+   "temp": 463,
+   "catalyst": null,
+   "rate": 0.3,
+   "effects": {
+    "gas": "nitrous_oxide"
+   }
+  },
+  {
+   "id": "nitric_organic",
+   "ru": "Нитрация (кислота+глицерин)",
+   "reactants": {
+    "nitric": 3,
+    "glycerin": 1
+   },
+   "products": {
+    "glycerin_dynamite": 1,
+    "water": 3
+   },
+   "dh": -30,
+   "temp": 283,
+   "catalyst": "sulfuric",
+   "rate": 0.15,
+   "effects": {
+    "unstable": 1
+   }
+  },
+  {
+   "id": "bleach_acid",
+   "ru": "Белизна + кислота",
+   "reactants": {
+    "bleach": 1,
+    "hcl": 1
+   },
+   "products": {
+    "chlorine": 1,
+    "water": 1
+   },
+   "dh": -25,
+   "temp": 273,
+   "catalyst": null,
+   "rate": 1.4,
+   "effects": {
+    "gas": "chlorine",
+    "toxic": 1
+   }
+  },
+  {
+   "id": "iron_acid",
+   "ru": "Железо + кислота",
+   "reactants": {
+    "hcl": 2,
+    "iron_oxide": 1
+   },
+   "products": {
+    "hydrogen": 1
+   },
+   "dh": -87,
+   "temp": 273,
+   "catalyst": null,
+   "rate": 0.2,
+   "effects": {
+    "gas": "hydrogen",
+    "fizz": 0.6
+   }
+  },
+  {
+   "id": "lava_water",
+   "ru": "Лава + вода",
+   "reactants": {
+    "lava": 1,
+    "water": 1
+   },
+   "products": {
+    "steam": 1
+   },
+   "dh": -1800,
+   "temp": 373,
+   "catalyst": null,
+   "rate": 3.0,
+   "effects": {
+    "explosion": 0.5,
+    "smoke": 1,
+    "gas": "steam"
+   }
+  },
+  {
+   "id": "lava_organic",
+   "ru": "Лава + органика",
+   "reactants": {
+    "lava": 1,
+    "gasoline": 1
+   },
+   "products": {
+    "co2": 8,
+    "water": 0
+   },
+   "dh": -4000,
+   "temp": 373,
+   "catalyst": null,
+   "rate": 2.5,
+   "effects": {
+    "fire": 1,
+    "smoke": 1
+   }
+  },
+  {
+   "id": "acid_skin",
+   "ru": "Кислота + органика",
+   "reactants": {
+    "sulfuric": 1
+   },
+   "products": {
+    "water": 0
+   },
+   "dh": -120,
+   "temp": 273,
+   "catalyst": null,
+   "rate": 0.6,
+   "effects": {
+    "corrode": 1
+   }
+  },
+  {
+   "id": "cyanide_acid",
+   "ru": "Цианид + кислота",
+   "reactants": {
+    "cyanide": 1,
+    "hcl": 1
+   },
+   "products": {
+    "hydrogen_sulfide": 0.0
+   },
+   "dh": -60,
+   "temp": 273,
+   "catalyst": null,
+   "rate": 2.0,
+   "effects": {
+    "gas": "hydrogen_sulfide",
+    "toxic": 1
+   }
+  },
+  {
+   "id": "mercury_sulfur",
+   "ru": "Ртуть + сера",
+   "reactants": {
+    "mercury": 1,
+    "sulfur_powder": 1
+   },
+   "products": {
+    "color_shift": 0
+   },
+   "dh": -60,
+   "temp": 273,
+   "catalyst": null,
+   "rate": 0.1,
+   "effects": {
+    "precipitate": "HgS"
+   }
+  },
+  {
+   "id": "oxygen_fire",
+   "ru": "Кислород + горючее",
+   "reactants": {
+    "oxygen": 1,
+    "gasoline": 1
+   },
+   "products": {
+    "co2": 8
+   },
+   "dh": -3000,
+   "temp": 280,
+   "catalyst": null,
+   "rate": 1.5,
+   "effects": {
+    "fire": 1,
+    "heat": 1
+   }
+  },
+  {
+   "id": "liquid_oxygen_explode",
+   "ru": "Жидкий кислород + органика",
+   "reactants": {
+    "liquid_oxygen": 1,
+    "kerosene": 1
+   },
+   "products": {
+    "co2": 8,
+    "water": 9
+   },
+   "dh": -6000,
+   "temp": 273,
+   "catalyst": null,
+   "rate": 7.0,
+   "effects": {
+    "explosion": 1.8,
+    "flash": 1
+   }
+  },
+  {
+   "id": "no2_water",
+   "ru": "NO2 + вода",
+   "reactants": {
+    "no2": 3,
+    "water": 1
+   },
+   "products": {
+    "nitric": 2,
+    "no2": 0
+   },
+   "dh": -117,
+   "temp": 273,
+   "catalyst": null,
+   "rate": 0.4,
+   "effects": {
+    "gas": "no2"
+   }
+  },
+  {
+   "id": "so2_water",
+   "ru": "SO2 + вода",
+   "reactants": {
+    "so2": 1,
+    "water": 1
+   },
+   "products": {
+    "sulfuric": 1
+   },
+   "dh": -90,
+   "temp": 273,
+   "catalyst": null,
+   "rate": 0.3,
+   "effects": {
+    "color_shift": 1
+   }
+  },
+  {
+   "id": "co2_water",
+   "ru": "CO2 + вода",
+   "reactants": {
+    "co2": 1,
+    "water": 1
+   },
+   "products": {
+    "limewater": 0
+   },
+   "dh": -20,
+   "temp": 273,
+   "catalyst": null,
+   "rate": 0.2,
+   "effects": {
+    "color_shift": 0.4
+   }
+  }
+ ]
+}
