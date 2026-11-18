@@ -43,7 +43,14 @@ namespace Elementa
             DynamicGI.UpdateEnvironment();
 
             var cam = Camera.main;
-            if (cam != null) cam.clearFlags = CameraClearFlags.Skybox;
+            if (shader != null && cam != null) cam.clearFlags = CameraClearFlags.Skybox;
+            else
+            {
+                // Skybox/Panoramic может не попасть в билд (Shader.Find по имени): тогда
+                // остаётся сплошной цвет камеры + задник, а не чёрный экран.
+                Debug.LogWarning("[ELEMENTA] Skybox/Panoramic недоступен — использую сплошной фон.");
+                if (cam != null) { cam.clearFlags = CameraClearFlags.SolidColor; cam.backgroundColor = new Color(0.145f, 0.16f, 0.205f); }
+            }
         }
 
         /// <summary>Procedural panoramic gradient with soft nebula bands and stars.</summary>

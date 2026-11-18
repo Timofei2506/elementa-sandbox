@@ -43,7 +43,7 @@ namespace Elementa
             cam.farClipPlane = 200f;
             cam.allowHDR = true;
             cam.allowMSAA = true;
-            cam.backgroundColor = new Color(0.055f, 0.065f, 0.085f);
+            cam.backgroundColor = new Color(0.145f, 0.16f, 0.205f); // не чёрный: даже без мира видно, что игра жива
             cam.clearFlags = CameraClearFlags.SolidColor;
             camGo.AddComponent<AudioListener>();
             rig.Cam = cam;

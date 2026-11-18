@@ -58,23 +58,28 @@ namespace Elementa
             var mr = go.AddComponent<MeshRenderer>();
             mr.sharedMaterial = RuntimeVisuals.ForDef(mat);
 
-            var col = go.AddComponent<Collider>();
+            // Collider абстрактный: AddComponent<Collider>() вернул бы null и следующий
+            // col.material уронил бы всю стартовую сцену. Создаём конкретный тип.
+            Collider col;
             switch (shape)
             {
                 case BodyShape.Sphere:
                     var sc = go.AddComponent<SphereCollider>();
                     sc.radius = 0.5f;
+                    col = sc;
                     break;
                 case BodyShape.Capsule:
                     var cc = go.AddComponent<CapsuleCollider>();
                     cc.radius = 0.5f; cc.height = 2f; cc.direction = 1;
+                    col = cc;
                     break;
                 case BodyShape.Cylinder:
                     var cy = go.AddComponent<CapsuleCollider>(); // вид сбоку: цилиндр читается как капсула
                     cy.radius = 0.5f; cy.height = 2f; cy.direction = 1;
+                    col = cy;
                     break;
                 default:
-                    go.AddComponent<BoxCollider>();
+                    col = go.AddComponent<BoxCollider>();
                     break;
             }
             // Cylinder/capsule primitives are 2 units tall: scale accordingly.
@@ -96,7 +101,7 @@ namespace Elementa
                 _ => size.x * size.y * size.z,
             };
             rb.mass = Mathf.Max(0.05f, mat.density * volume * 0.001f * 1000f * 0.001f);
-            rb.drag = 0.05f;
+            PhysicsCompat.SetLinearDamping(rb, 0.05f);
             PhysicsCompat.SetAngularDamping(rb, 0.1f);
             rb.interpolation = RigidbodyInterpolation.Interpolate;
             rb.collisionDetectionMode = CollisionDetectionMode.ContinuousDynamic;
@@ -115,7 +120,7 @@ namespace Elementa
                 dynamicFriction = Mathf.Lerp(0.85f, 0.4f, mat.elasticity),
                 staticFriction = Mathf.Lerp(0.9f, 0.5f, mat.elasticity),
             };
-            col.material = pm;
+            if (col != null) col.material = pm;
 
             var obj = go.AddComponent<SandboxObject>();
             obj.Material = mat;

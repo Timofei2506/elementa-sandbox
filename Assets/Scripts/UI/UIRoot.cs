@@ -36,12 +36,15 @@ namespace Elementa
 
         public static UIRoot Create()
         {
-            var go = new GameObject("UI");
+            // ВАЖНО: объект под Canvas обязан сразу иметь RectTransform, иначе
+            // (RectTransform)go.transform ниже падает с InvalidCastException.
+            var go = new GameObject("UI", typeof(RectTransform));
             var canvas = UIFactory.CreateCanvas("ELEMENTA_Canvas", 100);
             go.transform.SetParent(canvas.transform, false);
             var ui = go.AddComponent<UIRoot>();
             ui.Canvas = canvas;
-            ui.Root = (RectTransform)go.transform;
+            ui.Root = go.GetComponent<RectTransform>();
+            if (ui.Root == null) ui.Root = go.AddComponent<RectTransform>();
             UIFactory.SetAnchors(ui.Root, Vector2.zero, Vector2.one, Vector2.zero, Vector2.zero);
             ui.Build();
             return ui;

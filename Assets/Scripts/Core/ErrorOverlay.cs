@@ -25,10 +25,34 @@ namespace Elementa
             string line = condition;
             if (string.IsNullOrEmpty(line)) line = type.ToString();
             if (line.Length > 400) line = line.Substring(0, 400) + "…";
+            string where = FirstFrames(stackTrace);
+            if (!string.IsNullOrEmpty(where)) line += "   ← " + where;
             _messages.Add("• " + line);
             if (_messages.Count > MaxLines) _messages.RemoveAt(0);
             Refresh();
             Show();
+        }
+
+        /// <summary>Верхние кадры стека игровых скриптов — чтобы было видно, где именно упало.</summary>
+        static string FirstFrames(string stackTrace)
+        {
+            if (string.IsNullOrEmpty(stackTrace)) return "";
+            var sb = new StringBuilder();
+            int used = 0;
+            foreach (var raw in stackTrace.Split('\n'))
+            {
+                var l = raw.Trim();
+                if (l.Length == 0) continue;
+                if (!l.Contains("Elementa")) continue;      // только наш код, без внутренностей Unity
+                if (l.StartsWith("at Elementa.ErrorOverlay")) continue;
+                int paren = l.IndexOf(')');
+                var frame = l;
+                if (paren > 0) frame = l.Substring(0, paren + 1);
+                if (sb.Length > 0) sb.Append(" | ");
+                sb.Append(frame);
+                if (++used >= 2) break;                     // два кадра достаточно
+            }
+            return sb.ToString();
         }
 
         public static void Report(string message)
