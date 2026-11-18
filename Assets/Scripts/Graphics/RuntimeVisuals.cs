@@ -186,6 +186,63 @@ namespace Elementa
         }
 
         /// <summary>9-sliced rounded rectangle sprite so every panel has soft corners.</summary>
+        static Sprite _boxSprite, _frameSprite;
+
+        /// <summary>Пустой (белый) спрайт: прямоугольники без скруглений — стиль Melon.</summary>
+        public static Sprite BoxSprite
+        {
+            get
+            {
+                if (_boxSprite != null) return _boxSprite;
+                var tex = new Texture2D(4, 4, TextureFormat.RGBA32, false)
+                {
+                    name = "ELEMENTA_Box",
+                    wrapMode = TextureWrapMode.Clamp,
+                    filterMode = FilterMode.Point
+                };
+                var px = new Color32[16];
+                for (int i = 0; i < 16; i++) px[i] = new Color32(255, 255, 255, 255);
+                tex.SetPixels32(px);
+                tex.Apply(false);
+                _boxSprite = UnityEngine.Sprite.Create(tex, new Rect(0, 0, 4, 4), new Vector2(0.5f, 0.5f), 100f, 0, SpriteMeshType.FullRect, new Vector4(1, 1, 1, 1));
+                _boxSprite.name = "ELEMENTA_BoxSprite";
+                return _boxSprite;
+            }
+        }
+
+        /// <summary>
+        /// Рамка толщиной border px: белый контур, прозрачная середина. Тянится 9-slice,
+        /// поэтому из неё получаются жёсткие рамки любого размера — как в Melon Sandbox.
+        /// </summary>
+        public static Sprite Frame(int size = 32, int border = 3)
+        {
+            string key = "frame_" + size + "_" + border;
+            if (_frameCache.TryGetValue(key, out var cached) && cached != null) return cached;
+            border = Mathf.Clamp(border, 1, size / 2 - 1);
+            var tex = new Texture2D(size, size, TextureFormat.RGBA32, false)
+            {
+                name = "ELEMENTA_Frame",
+                wrapMode = TextureWrapMode.Clamp,
+                filterMode = FilterMode.Point
+            };
+            var px = new Color32[size * size];
+            for (int y = 0; y < size; y++)
+                for (int x = 0; x < size; x++)
+                {
+                    bool edge = x < border || y < border || x >= size - border || y >= size - border;
+                    px[y * size + x] = edge ? new Color32(255, 255, 255, 255) : new Color32(255, 255, 255, 0);
+                }
+            tex.SetPixels32(px);
+            tex.Apply(false);
+            var sp = UnityEngine.Sprite.Create(tex, new Rect(0, 0, size, size), new Vector2(0.5f, 0.5f), 100f, 0,
+                SpriteMeshType.FullRect, new Vector4(border, border, border, border));
+            sp.name = "ELEMENTA_FrameSprite";
+            _frameCache[key] = sp;
+            return sp;
+        }
+
+        static readonly Dictionary<string, Sprite> _frameCache = new Dictionary<string, Sprite>();
+
         public static Sprite Rounded(int size = 64, int radius = 18)
         {
             string key = $"r{size}_{radius}";

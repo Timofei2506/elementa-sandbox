@@ -7,23 +7,29 @@ namespace Elementa
     /// <summary>Design tokens shared by the whole interface.</summary>
     public static class Theme
     {
-        public static readonly Color Bg = new Color(0.055f, 0.063f, 0.082f, 0.96f);
-        public static readonly Color Panel = new Color(0.086f, 0.098f, 0.125f, 0.98f);
-        public static readonly Color PanelLight = new Color(0.135f, 0.153f, 0.19f, 1f);
-        public static readonly Color Stroke = new Color(0.22f, 0.25f, 0.32f, 0.9f);
-        public static readonly Color Accent = new Color(0.24f, 0.83f, 0.78f, 1f);
-        public static readonly Color AccentDim = new Color(0.16f, 0.55f, 0.52f, 1f);
-        public static readonly Color Warn = new Color(1f, 0.68f, 0.25f, 1f);
-        public static readonly Color Danger = new Color(1f, 0.35f, 0.35f, 1f);
-        public static readonly Color Text = new Color(0.92f, 0.95f, 0.98f, 1f);
-        public static readonly Color TextDim = new Color(0.62f, 0.68f, 0.76f, 1f);
-        public static readonly Color Card = new Color(0.115f, 0.13f, 0.16f, 1f);
+        // ---- палитра: чёрные панели, белые жёсткие рамки, крупные подписи ----
+        public static readonly Color Bg = new Color(0.035f, 0.035f, 0.04f, 0.97f);
+        public static readonly Color Panel = new Color(0.04f, 0.04f, 0.045f, 0.975f);
+        public static readonly Color PanelLight = new Color(0.12f, 0.12f, 0.13f, 1f);
+        public static readonly Color Stroke = new Color(0.92f, 0.93f, 0.95f, 1f);       // белая рамка
+        public static readonly Color StrokeDim = new Color(0.45f, 0.47f, 0.5f, 1f);      // пассивная рамка
+        public static readonly Color Accent = new Color(1f, 0.86f, 0.22f, 1f);           // жёлтый, как у Melon
+        public static readonly Color AccentDim = new Color(0.62f, 0.53f, 0.14f, 1f);
+        public static readonly Color Warn = new Color(1f, 0.66f, 0.18f, 1f);
+        public static readonly Color Danger = new Color(0.95f, 0.28f, 0.26f, 1f);
+        public static readonly Color Text = new Color(0.97f, 0.97f, 0.98f, 1f);
+        public static readonly Color TextDim = new Color(0.72f, 0.74f, 0.77f, 1f);
+        public static readonly Color Card = new Color(0.80f, 0.81f, 0.83f, 1f);           // светлая плитка предмета
+        public static readonly Color CardDark = new Color(0.16f, 0.16f, 0.17f, 1f);
+        public static readonly Color Slot = new Color(0.10f, 0.10f, 0.11f, 1f);
+        public static readonly Color Ink = new Color(0.05f, 0.05f, 0.06f, 1f);            // текст на светлой плитке
 
-        public const int FontTitle = 30;
-        public const int FontHeader = 21;
-        public const int FontBody = 16;
-        public const int FontSmall = 13;
-        public const int FontTiny = 11;
+        public const int FontTitle = 34;
+        public const int FontHeader = 24;
+        public const int FontBody = 17;
+        public const int FontSmall = 14;
+        public const int FontTiny = 12;
+        public const int FontIcon = 26;
 
         public static Font Font { get; private set; }
 
@@ -87,6 +93,155 @@ namespace Elementa
             if (img == null) return;
             img.sprite = RuntimeVisuals.Rounded(64, Mathf.Clamp((int)radius, 4, 28));
             img.type = Image.Type.Sliced;
+        }
+
+        // ================= стиль Melon Sandbox =================
+        // Чёрная подложка + ЖЁСТКАЯ белая рамка + крупный счётчик. Никаких мягких теней.
+
+        /// <summary>Рамка-контур поверх прямоугольника: жёсткая белая обводка, как в Melon.</summary>
+        public static Image Frame(RectTransform host, float thickness = 2f, Color? color = null)
+        {
+            var go = new GameObject("Frame", typeof(RectTransform));
+            go.transform.SetParent(host, false);
+            var rt = (RectTransform)go.transform;
+            rt.anchorMin = Vector2.zero; rt.anchorMax = Vector2.one;
+            rt.offsetMin = Vector2.zero; rt.offsetMax = Vector2.zero;
+            var img = go.AddComponent<Image>();
+            img.sprite = RuntimeVisuals.Frame(32, Mathf.Clamp(Mathf.RoundToInt(thickness), 1, 6));
+            img.type = Image.Type.Sliced;
+            img.color = color ?? Theme.Stroke;
+            img.raycastTarget = false;
+            return img;
+        }
+
+        /// <summary>Чёрная панель с жёсткой белой рамкой — базовый контейнер интерфейса.</summary>
+        public static RectTransform SteelPanel(Transform parent, string name, float border = 2f, Color? fill = null)
+        {
+            var rt = Box(parent, name, Vector2.zero, Vector2.one, Vector2.zero, Vector2.zero);
+            var img = rt.gameObject.AddComponent<Image>();
+            img.sprite = RuntimeVisuals.BoxSprite;
+            img.type = Image.Type.Sliced;
+            img.color = fill ?? Theme.Panel;
+            Frame(rt, border);
+            return rt;
+        }
+
+        /// <summary>
+        /// Квадратная кнопка-иконка со значком и подписью снизу (или только значок).
+        /// При нажатии подсвечивается жёлтым — как выбранный инструмент в Melon.
+        /// </summary>
+        public static Button IconButton(Transform parent, string icon, string caption, Vector2 size,
+                                        Action onClick, int iconSize = Theme.FontIcon, int captionSize = Theme.FontTiny)
+        {
+            var go = new GameObject("Icon_" + caption, typeof(RectTransform));
+            go.transform.SetParent(parent, false);
+            var rt = (RectTransform)go.transform;
+            rt.sizeDelta = size;
+
+            var bg = go.AddComponent<Image>();
+            bg.sprite = RuntimeVisuals.BoxSprite;
+            bg.type = Image.Type.Sliced;
+            bg.color = Theme.Slot;
+
+            var btn = go.AddComponent<Button>();
+            btn.targetGraphic = bg;
+            var colors = btn.colors;
+            colors.normalColor = Color.white;
+            colors.highlightedColor = new Color(1.25f, 1.25f, 1.25f, 1f);
+            colors.pressedColor = new Color(0.7f, 0.7f, 0.7f, 1f);
+            colors.fadeDuration = 0.04f;
+            btn.colors = colors;
+            if (onClick != null) btn.onClick.AddListener(() => onClick());
+
+            var frame = Frame(rt, 2f, Theme.StrokeDim);
+
+            bool hasCaption = !string.IsNullOrEmpty(caption);
+            if (!string.IsNullOrEmpty(icon))
+            {
+                var gl = Label(rt, icon, iconSize, Theme.Text, hasCaption ? TextAnchor.UpperCenter : TextAnchor.MiddleCenter);
+                SetAnchors((RectTransform)gl.transform,
+                    hasCaption ? new Vector2(0f, 1f) : Vector2.zero,
+                    Vector2.one,
+                    hasCaption ? new Vector2(0f, -size.y * 0.55f) : Vector2.zero,
+                    hasCaption ? new Vector2(0f, -2f) : Vector2.zero);
+            }
+            if (hasCaption)
+            {
+                var cl = Label(rt, caption, captionSize, Theme.TextDim, TextAnchor.LowerCenter);
+                SetAnchors((RectTransform)cl.transform, new Vector2(0f, 0f), new Vector2(1f, 0f),
+                    new Vector2(2f, 3f), new Vector2(-2f, size.y * 0.42f));
+            }
+            return btn;
+        }
+
+        /// <summary>Плитка предмета: светлый квадрат-слот с превью и подписью, как в сетке Melon.</summary>
+        public static Button Tile(Transform parent, string caption, Color swatch, Vector2 cell,
+                                  Action onClick, string badge = null, bool selected = false, string glyph = null)
+        {
+            var go = new GameObject("Tile_" + caption, typeof(RectTransform));
+            go.transform.SetParent(parent, false);
+
+            var bg = go.AddComponent<Image>();
+            bg.sprite = RuntimeVisuals.BoxSprite;
+            bg.type = Image.Type.Sliced;
+            bg.color = selected ? Theme.Accent : Theme.Card;
+
+            var btn = go.AddComponent<Button>();
+            btn.targetGraphic = bg;
+            var colors = btn.colors;
+            colors.normalColor = Color.white;
+            colors.highlightedColor = new Color(1.12f, 1.12f, 1.12f, 1f);
+            colors.pressedColor = new Color(0.78f, 0.78f, 0.78f, 1f);
+            colors.fadeDuration = 0.04f;
+            btn.colors = colors;
+            if (onClick != null) btn.onClick.AddListener(() => onClick());
+
+            // превью: цветной образец материала с рамкой
+            var head = Mathf.Round(cell.y * 0.44f);
+            var chip = Box(go.transform, "Chip", new Vector2(0f, 1f), new Vector2(1f, 1f),
+                new Vector2(4f, -head - 2f), new Vector2(-4f, -4f), swatch);
+            chip.GetComponent<Image>().sprite = RuntimeVisuals.BoxSprite;
+            chip.GetComponent<Image>().type = Image.Type.Sliced;
+            Frame(chip, 2f, new Color(0.3f, 0.3f, 0.32f, 1f));
+
+            if (!string.IsNullOrEmpty(glyph))
+            {
+                var gl = Label(chip, glyph, Theme.FontIcon, new Color(0f, 0f, 0f, 0.72f), TextAnchor.MiddleCenter);
+                SetAnchors((RectTransform)gl.transform, Vector2.zero, Vector2.one, Vector2.zero, Vector2.zero);
+            }
+
+            var cap = Label(go.transform, caption, Theme.FontTiny, selected ? Theme.Ink : Theme.Ink, TextAnchor.UpperCenter);
+            cap.fontStyle = FontStyle.Bold;
+            SetAnchors((RectTransform)cap.transform, new Vector2(0f, 0f), new Vector2(1f, 1f),
+                new Vector2(3f, 2f), new Vector2(-3f, -head - 4f));
+
+            if (!string.IsNullOrEmpty(badge))
+            {
+                var b = Label(go.transform, badge, 10, new Color(0.25f, 0.25f, 0.27f, 1f), TextAnchor.UpperLeft);
+                SetAnchors((RectTransform)b.transform, new Vector2(0f, 1f), new Vector2(0f, 1f),
+                    new Vector2(5f, -16f), new Vector2(28f, -4f));
+            }
+            return btn;
+        }
+
+        /// <summary>Выбранный/невыбранный вид IconButton (жёлтая рамка + жёлтая заливка).</summary>
+        public static void SetSelected(Button btn, bool selected)
+        {
+            if (btn == null) return;
+            var bg = btn.GetComponent<Image>();
+            if (bg != null) bg.color = selected ? Theme.Accent : Theme.Slot;
+            var frame = btn.transform.Find("Frame");
+            if (frame != null)
+            {
+                var fi = frame.GetComponent<Image>();
+                if (fi != null) fi.color = selected ? Theme.Accent : Theme.StrokeDim;
+            }
+            foreach (var t in btn.GetComponentsInChildren<Text>(true))
+            {
+                bool isIcon = t.fontSize >= Theme.FontIcon - 4;
+                if (isIcon) t.color = selected ? Theme.Ink : Theme.Text;
+                else if (selected) t.color = Theme.Ink;
+            }
         }
 
         public static RectTransform Panel(Transform parent, string name, Color color, float radius = 14f)

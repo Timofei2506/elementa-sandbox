@@ -7,21 +7,22 @@ using UnityEngine.UI;
 namespace Elementa
 {
     /// <summary>
-    /// Левая вертикальная панель Melon-стиля: колонка инструментов + сменные панели
-    /// (предметы, оружие, персонажи, жидкости, сцены). Всё строится кодом,
-    /// поэтому панель одинаково работает на ПК и на телефоне.
+    /// Панель предметов в духе Melon Sandbox: слева узкая колонка крупных квадратных
+    /// кнопок-инструментов, справа сетка плиток с превью. Чёрные панели, жёсткие белые
+    /// рамки, жёлтая подсветка выбранного. Всё строится кодом, поэтому панель одинаково
+    /// выглядит на ПК и на телефоне.
     /// </summary>
     public class InventoryPanel : MonoBehaviour
     {
         public enum Page { Materials, Weapons, Npc, Fluids, Scenes, Shapes }
 
-        const float ToolColWidth = 118f;
+        const float ToolColWidth = 168f;
         const float PageWidth = 470f;
 
         UIRoot _ui;
-        RectTransform _toolCol, _page;
-        readonly List<GameObject> _toolButtons = new List<GameObject>();
-        readonly List<GameObject> _pageButtons = new List<GameObject>();
+        RectTransform _toolCol, _page, _strip;
+        readonly List<Button> _toolButtons = new List<Button>();
+        readonly List<(Button btn, Page page)> _tabButtons = new List<(Button, Page)>();
         Text _pageTitle, _footer;
         Page _current = Page.Materials;
         PlayerController Pc => Game.I?.World != null ? Game.I.World.GetComponent<PlayerController>() : null;
@@ -29,7 +30,7 @@ namespace Elementa
         public static InventoryPanel Create(UIRoot ui, RectTransform parent)
         {
             var rt = UIFactory.Box(parent, "Inventory", new Vector2(0f, 0f), new Vector2(0f, 1f),
-                                   new Vector2(10f, 120f), new Vector2(10f + ToolColWidth + PageWidth + 22f, -66f));
+                                   new Vector2(10f, 110f), new Vector2(10f + ToolColWidth + PageWidth + 22f, -62f));
             var panel = rt.gameObject.AddComponent<InventoryPanel>();
             panel._ui = ui;
             panel.Build(rt);
@@ -38,139 +39,184 @@ namespace Elementa
 
         void Build(RectTransform root)
         {
-            _toolCol = UIFactory.Panel(root, "ToolCol", Theme.Panel, 14f);
+            // ---- колонка инструментов: чёрная плита с белой рамкой ----
+            _toolCol = UIFactory.SteelPanel(root, "ToolCol", 2f);
             UIFactory.SetAnchors(_toolCol, new Vector2(0f, 0f), new Vector2(0f, 1f), Vector2.zero, new Vector2(ToolColWidth, 0f));
 
-            _page = UIFactory.Panel(root, "Page", new Color(0.075f, 0.086f, 0.11f, 0.985f), 14f);
-            UIFactory.SetAnchors(_page, new Vector2(0f, 0f), new Vector2(1f, 1f), new Vector2(ToolColWidth + 10f, 0f), Vector2.zero);
+            // ---- страница предметов ----
+            _page = UIFactory.SteelPanel(root, "Page", 2f, new Color(0.035f, 0.035f, 0.04f, 0.985f));
+            UIFactory.SetAnchors(_page, new Vector2(0f, 0f), new Vector2(1f, 1f), new Vector2(ToolColWidth + 8f, 0f), Vector2.zero);
 
             BuildToolColumn();
-            BuildPageHeader();
+            BuildTabs();
             ShowPage(Page.Materials, true);
         }
 
         // ---------------- колонка инструментов ----------------
+        static readonly (ToolId tool, string icon, string caption)[] Tools =
+        {
+            (ToolId.Select, "✥", "Рука"),
+            (ToolId.Spawn,  "▣", "Предмет"),
+            (ToolId.Fluid,  "◍", "Жидкость"),
+            (ToolId.Weapon, "➤", "Оружие"),
+            (ToolId.Fire,   "✷", "Огонь"),
+            (ToolId.Heat,   "♨", "Жар"),
+            (ToolId.Hammer, "⚒", "Молот"),
+            (ToolId.Npc,    "☺", "Люди"),
+            (ToolId.Grab,   "◷", "Время"),
+            (ToolId.Delete, "✖", "Ластик"),
+        };
+
         void BuildToolColumn()
         {
-            var v = UIFactory.VLayout(_toolCol, 4f, new RectOffset(6, 6, 8, 8));
-            v.childAlignment = TextAnchor.UpperCenter;
-            var caption = UIFactory.Label(_toolCol, "ИНСТРУМЕНТ", Theme.FontTiny, Theme.TextDim, TextAnchor.MiddleCenter);
-            caption.gameObject.AddComponent<LayoutElement>().preferredHeight = 16f;
+            var header = UIFactory.Label(_toolCol, "ИНСТРУМЕНТ", Theme.FontTiny, Theme.TextDim, TextAnchor.MiddleCenter);
+            UIFactory.SetAnchors((RectTransform)header.transform, new Vector2(0f, 1f), new Vector2(1f, 1f),
+                new Vector2(4f, -26f), new Vector2(-4f, -4f));
 
-            var icons = new Dictionary<ToolId, string>
+            var gridRt = UIFactory.Box(_toolCol, "ToolGrid", Vector2.zero, Vector2.one, Vector2.zero, Vector2.zero);
+            UIFactory.SetAnchors(gridRt, new Vector2(0f, 0f), new Vector2(1f, 1f), new Vector2(8f, 40f), new Vector2(-8f, -30f));
+            var g = gridRt.gameObject.AddComponent<GridLayoutGroup>();
+            g.cellSize = new Vector2(70f, 74f);
+            g.spacing = new Vector2(6f, 6f);
+            g.padding = new RectOffset(0, 0, 0, 0);
+            g.constraint = GridLayoutGroup.Constraint.FixedColumnCount;
+            g.constraintCount = 2;
+            g.childAlignment = TextAnchor.UpperCenter;
+
+            var keys = new Dictionary<ToolId, string>
             {
-                { ToolId.Select, "✥" }, { ToolId.Spawn, "▣" }, { ToolId.Fluid, "◍" }, { ToolId.Weapon, "➤" },
-                { ToolId.Fire, "✷" }, { ToolId.Heat, "♨" }, { ToolId.Hammer, "⚒" }, { ToolId.Npc, "☺" },
-                { ToolId.Grab, "◎" }, { ToolId.Delete, "✖" },
+                { ToolId.Select, "1" }, { ToolId.Spawn, "2" }, { ToolId.Fluid, "3" }, { ToolId.Weapon, "4" },
+                { ToolId.Fire, "5" }, { ToolId.Heat, "6" }, { ToolId.Hammer, "7" }, { ToolId.Npc, "8" },
+                { ToolId.Grab, "9" }, { ToolId.Delete, "0" },
             };
-            int index = 1;
-            foreach (var tool in PlayerController.AllTools)
+
+            foreach (var (tool, icon, caption) in Tools)
             {
                 var t = tool;
-                var go = new GameObject("Tool_" + tool, typeof(RectTransform));
-                go.transform.SetParent(_toolCol, false);
-                var le = go.AddComponent<LayoutElement>();
-                le.preferredHeight = 54f;
-
-                var img = go.AddComponent<Image>();
-                img.color = Theme.Card;
-                img.sprite = RuntimeVisuals.Rounded(64, 12);
-                img.type = Image.Type.Sliced;
-                var btn = go.AddComponent<Button>();
-                btn.targetGraphic = img;
-                btn.onClick.AddListener(() => { Pc?.SelectTool(t); RefreshToolHighlight(); });
-                var marker = go.AddComponent<ToolButtonMarker>();
-                marker.Tool = t;
-
-                var icon = UIFactory.Label(go.transform, icons.TryGetValue(tool, out var ic) ? ic : "•", 22, Theme.Text, TextAnchor.UpperCenter);
-                UIFactory.SetAnchors((RectTransform)icon.transform, new Vector2(0f, 1f), new Vector2(1f, 1f), new Vector2(0f, -30f), new Vector2(0f, -4f));
-
-                var name = UIFactory.Label(go.transform, PlayerController.ShortToolName(tool), Theme.FontTiny, Theme.TextDim, TextAnchor.LowerCenter);
-                UIFactory.SetAnchors((RectTransform)name.transform, new Vector2(0f, 0f), new Vector2(1f, 0f), new Vector2(2f, 3f), new Vector2(-2f, 20f));
-
-                var key = UIFactory.Label(go.transform, index.ToString(), 9, Theme.AccentDim, TextAnchor.UpperLeft);
-                UIFactory.SetAnchors((RectTransform)key.transform, new Vector2(0f, 1f), new Vector2(0f, 1f), new Vector2(5f, -15f), new Vector2(20f, -3f));
-
-                _toolButtons.Add(go);
-                index = (index + 1) % 10;
+                var btn = UIFactory.IconButton(gridRt, icon, caption, new Vector2(70f, 74f),
+                    () => { Pc?.SelectTool(t); RefreshToolHighlight(); });
+                var key = UIFactory.Label(btn.transform, keys.TryGetValue(tool, out var k) ? k : "", 10,
+                    new Color(0.55f, 0.56f, 0.6f, 1f), TextAnchor.UpperLeft);
+                UIFactory.SetAnchors((RectTransform)key.transform, new Vector2(0f, 1f), new Vector2(0f, 1f),
+                    new Vector2(4f, -15f), new Vector2(18f, -3f));
+                _toolButtons.Add(btn);
+                btn.gameObject.AddComponent<ToolButtonMarker>().Tool = t;
             }
-            RefreshToolHighlight();
+
+            // нижние кнопки-действия: пауза и сброс — как в Melon «CLEAR EVERYTHING»
+            var actions = UIFactory.Box(_toolCol, "ToolActions", new Vector2(0f, 0f), new Vector2(1f, 0f),
+                new Vector2(8f, 8f), new Vector2(-8f, 38f));
+            UIFactory.Frame(actions, 2f, Theme.StrokeDim);
+            var h = actions.gameObject.AddComponent<HorizontalLayoutGroup>();
+            h.spacing = 4f;
+            h.padding = new RectOffset(4, 4, 4, 4);
+            h.childControlWidth = true;
+            h.childForceExpandWidth = true;
+            h.childControlHeight = true;
+            h.childForceExpandHeight = true;
+
+            UIFactory.Button(actions, "ПАУЗА", new Vector2(0f, 24f), () => _ui?.TogglePause(), Theme.Slot, Theme.FontTiny);
+            UIFactory.Button(actions, "СБРОС", new Vector2(0f, 24f), () =>
+            {
+                Game.I?.World?.ResetWorld();
+                _ui?.Log("Мир сброшен.");
+            }, Theme.Slot, Theme.FontTiny);
         }
 
         void RefreshToolHighlight()
         {
             var pc = Pc;
-            foreach (var go in _toolButtons)
+            for (int i = 0; i < _toolButtons.Count; i++)
             {
-                var marker = go.GetComponent<ToolButtonMarker>();
-                var img = go.GetComponent<Image>();
-                if (marker == null || img == null) continue;
-                bool active = pc != null && pc.CurrentTool == marker.Tool;
-                img.color = active ? Theme.Accent : Theme.Card;
-                var icon = go.transform.Find("Label") != null ? null : go.GetComponentInChildren<Text>();
-                if (icon != null) icon.color = active ? Theme.Bg : Theme.Text;
+                var marker = _toolButtons[i].GetComponent<ToolButtonMarker>();
+                bool active = pc != null && marker != null && pc.CurrentTool == marker.Tool;
+                UIFactory.SetSelected(_toolButtons[i], active);
             }
         }
 
-        // ---------------- шапка страницы ----------------
-        void BuildPageHeader()
+        // ---------------- вкладки ----------------
+        static readonly (Page page, string caption)[] Tabs =
         {
-            var tabs = UIFactory.Box(_page, "PageTabs", new Vector2(0f, 1f), new Vector2(1f, 1f), new Vector2(8f, -76f), new Vector2(-8f, -6f));
-            var h = UIFactory.HLayout(tabs, 4f, new RectOffset(0, 0, 0, 0));
-            h.childAlignment = TextAnchor.MiddleLeft;
-            foreach (var (page, caption) in new (Page, string)[]
-            {
-                (Page.Materials, "ПРЕДМЕТЫ"), (Page.Weapons, "ОРУЖИЕ"), (Page.Npc, "ЛЮДИ"),
-                (Page.Fluids, "ЖИДКОСТИ"), (Page.Scenes, "СЦЕНЫ"),
-            })
+            (Page.Materials, "ПРЕДМЕТЫ"), (Page.Weapons, "ОРУЖИЕ"), (Page.Npc, "ЛЮДИ"),
+            (Page.Fluids, "ЖИДКОСТИ"), (Page.Scenes, "СЦЕНЫ"),
+        };
+
+        void BuildTabs()
+        {
+            _strip = UIFactory.Box(_page, "PageTabs", new Vector2(0f, 1f), new Vector2(1f, 1f),
+                new Vector2(0f, -52f), Vector2.zero);
+            _strip.gameObject.AddComponent<Image>().color = Theme.Bg;
+            UIFactory.Frame(_strip, 2f, Theme.StrokeDim);
+            var h = _strip.gameObject.AddComponent<HorizontalLayoutGroup>();
+            h.spacing = 0f;
+            h.padding = new RectOffset(3, 3, 3, 3);
+            h.childControlWidth = true;
+            h.childForceExpandWidth = true;
+            h.childControlHeight = true;
+            h.childForceExpandHeight = true;
+
+            foreach (var (page, caption) in Tabs)
             {
                 var p = page;
-                var btn = UIFactory.Button(tabs, caption, new Vector2(84f, 30f), () => ShowPage(p), Theme.Card, Theme.FontTiny);
-                btn.gameObject.AddComponent<LayoutElement>().preferredWidth = 84f;
-                btn.gameObject.AddComponent<PageTabMarker>().Page = page;
+                var btn = UIFactory.Button(_strip, caption, new Vector2(0f, 42f), () => ShowPage(p), Theme.Slot, Theme.FontTiny);
+                _tabButtons.Add((btn, page));
             }
 
-            _pageTitle = UIFactory.Label(_page, "ПРЕДМЕТЫ", Theme.FontHeader, Theme.Accent, TextAnchor.MiddleLeft, FontStyle.Bold);
-            UIFactory.SetAnchors((RectTransform)_pageTitle.transform, new Vector2(0f, 1f), new Vector2(1f, 1f), new Vector2(14f, -112f), new Vector2(-14f, -80f));
-            _pageTitle.gameObject.SetActive(false);
-
-            _footer = UIFactory.Label(_page, "", Theme.FontTiny, Theme.TextDim, TextAnchor.MiddleLeft);
-            UIFactory.SetAnchors((RectTransform)_footer.transform, new Vector2(0f, 0f), new Vector2(1f, 0f), new Vector2(12f, 2f), new Vector2(-12f, 24f));
+            // полоса-шапка: заголовок выбранной страницы + счётчик
+            _pageTitle = UIFactory.Label(_page, "", Theme.FontSmall, Theme.TextDim, TextAnchor.MiddleLeft);
+            UIFactory.SetAnchors((RectTransform)_pageTitle.transform, new Vector2(0f, 1f), new Vector2(1f, 1f),
+                new Vector2(8f, -74f), new Vector2(-8f, -54f));
         }
 
-        public void ShowPage(Page page, bool silent = false)
+        void ShowPage(Page page, bool silent = false)
         {
             _current = page;
-            foreach (var go in _pageButtons) Destroy(go);
-            _pageButtons.Clear();
-            foreach (var tab in _page.GetComponentsInChildren<PageTabMarker>())
+            foreach (var (btn, p) in _tabButtons) UIFactory.SetSelected(btn, p == page);
+            RefreshToolHighlight();
+
+            for (int i = _page.childCount - 1; i >= 0; i--)
             {
-                var img = tab.GetComponent<Image>();
-                if (img != null) img.color = tab.Page == page ? Theme.AccentDim : Theme.Card;
+                var child = _page.GetChild(i);
+                if (child == _strip || child.name == "PageTabs" || child.name == "Label") continue;
+                if (child.GetComponent<PageTabMarker>() != null) continue;
+                if (child.name == "Body" || child.name == "Footer" || child.name == "PageTabs") Destroy(child.gameObject);
             }
 
-            // область контента
-            var old = _page.Find("Content");
-            if (old != null) Destroy(old.gameObject);
+            var body = UIFactory.Box(_page, "Body", Vector2.zero, Vector2.one,
+                new Vector2(4f, 28f), new Vector2(-4f, -78f));
+            body.gameObject.AddComponent<Image>().color = new Color(0f, 0f, 0f, 0.001f);
+            body.gameObject.AddComponent<Mask>().showMaskGraphic = false;
 
-            var content = UIFactory.Box(_page, "Content", new Vector2(0f, 0f), new Vector2(1f, 1f), new Vector2(8f, 28f), new Vector2(-8f, -80f));
+            _footer = UIFactory.Label(_page, "", Theme.FontTiny, Theme.TextDim, TextAnchor.MiddleLeft);
+            UIFactory.SetAnchors((RectTransform)_footer.transform, new Vector2(0f, 0f), new Vector2(1f, 0f),
+                new Vector2(8f, 4f), new Vector2(-8f, 26f));
+
             switch (page)
             {
-                case Page.Materials: BuildMaterials(content); break;
-                case Page.Weapons: BuildWeapons(content); break;
-                case Page.Npc: BuildNpcs(content); break;
-                case Page.Fluids: BuildFluids(content); break;
-                case Page.Scenes: BuildScenes(content); break;
+                case Page.Materials: BuildMaterials(body); break;
+                case Page.Weapons: BuildWeapons(body); break;
+                case Page.Npc: BuildNpcs(body); break;
+                case Page.Fluids: BuildFluids(body); break;
+                case Page.Scenes: BuildScenes(body); break;
             }
-            if (!silent) Game.I?.UI?.Log("Панель: " + page);
+            if (!silent) _ui?.Log("Панель: " + PageName(page));
         }
 
-        // ---------------- сетка предметов ----------------
+        static string PageName(Page p) => p switch
+        {
+            Page.Materials => "Предметы",
+            Page.Weapons => "Оружие",
+            Page.Npc => "Люди",
+            Page.Fluids => "Жидкости",
+            Page.Scenes => "Сцены",
+            _ => p.ToString(),
+        };
+
+        // ---------------- сетка ---------------- （плитки 3 в ряд, как в Melon）
         RectTransform Grid(Transform parent, int columns, float cellW, float cellH, out ScrollRect scroll)
         {
             var viewport = UIFactory.Box(parent, "Grid", Vector2.zero, Vector2.one, Vector2.zero, Vector2.zero);
-            var bg = viewport.gameObject.AddComponent<Image>();
-            bg.color = new Color(0f, 0f, 0f, 0.001f);
+            viewport.gameObject.AddComponent<Image>().color = new Color(0f, 0f, 0f, 0.001f);
             viewport.gameObject.AddComponent<Mask>().showMaskGraphic = false;
 
             var content = UIFactory.Box(viewport, "Content", new Vector2(0f, 1f), new Vector2(1f, 1f), Vector2.zero, Vector2.zero);
@@ -181,7 +227,7 @@ namespace Elementa
 
             var g = content.gameObject.AddComponent<GridLayoutGroup>();
             g.cellSize = new Vector2(cellW, cellH);
-            g.spacing = new Vector2(6f, 6f);
+            g.spacing = new Vector2(5f, 5f);
             g.padding = new RectOffset(2, 2, 2, 8);
             g.constraint = GridLayoutGroup.Constraint.FixedColumnCount;
             g.constraintCount = columns;
@@ -197,109 +243,103 @@ namespace Elementa
             return content;
         }
 
-        /// <summary>Карточка предмета: цветной образец, название, ключевые характеристики.</summary>
-        RectTransform Card(Transform parent, string title, string subtitle, Color swatch, Action onClick, bool selected = false)
-        {
-            var go = new GameObject("Card_" + title, typeof(RectTransform));
-            go.transform.SetParent(parent, false);
-            var img = go.AddComponent<Image>();
-            img.color = selected ? new Color(0.16f, 0.36f, 0.34f, 1f) : Theme.Card;
-            img.sprite = RuntimeVisuals.Rounded(64, 10);
-            img.type = Image.Type.Sliced;
-            var btn = go.AddComponent<Button>();
-            btn.targetGraphic = img;
-            btn.onClick.AddListener(() => onClick());
-
-            var chip = UIFactory.Box(go.transform, "Swatch", new Vector2(0f, 0.5f), new Vector2(0f, 0.5f), new Vector2(8f, -14f), new Vector2(36f, 14f), swatch);
-            chip.GetComponent<Image>().sprite = RuntimeVisuals.Rounded(32, 8);
-            chip.GetComponent<Image>().type = Image.Type.Sliced;
-
-            var t = UIFactory.Label(go.transform, title, Theme.FontSmall, Theme.Text, TextAnchor.UpperLeft);
-            UIFactory.SetAnchors((RectTransform)t.transform, new Vector2(0f, 0f), new Vector2(1f, 1f), new Vector2(42f, 2f), new Vector2(-6f, -4f));
-
-            if (!string.IsNullOrEmpty(subtitle))
-            {
-                var st = UIFactory.Label(go.transform, subtitle, Theme.FontTiny, Theme.TextDim, TextAnchor.LowerLeft);
-                UIFactory.SetAnchors((RectTransform)st.transform, new Vector2(0f, 0f), new Vector2(1f, 0f), new Vector2(42f, 3f), new Vector2(-6f, 20f));
-            }
-            return (RectTransform)go.transform;
-        }
-
         void BuildMaterials(RectTransform parent)
         {
             var pc = Pc;
-            var content = Grid(parent, 2, 210f, 58f, out _);
+            var content = Grid(parent, 3, 148f, 104f, out _);
+            _pageTitle.text = "ФОРМА И МАТЕРИАЛ";
 
-            // формы предметов — первая строка
-            foreach (var (shape, caption) in new (BodyShape, string)[]
+            // ---- формы предметов — первая строка, как «USERS MODS» в Melon
+            var shapes = new (BodyShape shape, string caption, string glyph)[]
             {
-                (BodyShape.Box, "Куб"), (BodyShape.Plate, "Плита"), (BodyShape.Sphere, "Шар"),
-                (BodyShape.Cylinder, "Цилиндр"), (BodyShape.Capsule, "Капсула"),
-            })
+                (BodyShape.Box, "Куб", "■"), (BodyShape.Plate, "Плита", "▬"), (BodyShape.Sphere, "Шар", "●"),
+                (BodyShape.Cylinder, "Цилиндр", "▮"), (BodyShape.Capsule, "Капсула", "⬮"),
+            };
+            foreach (var (shape, caption, glyph) in shapes)
             {
                 var s = shape;
-                var selected = pc != null && pc.SelectedShape == shape;
-                Card(content, caption, "форма", selected ? Theme.Accent : Theme.Stroke,
-                     () => { pc.SetShape(s); pc.SelectTool(ToolId.Spawn); ShowPage(Page.Materials); }, selected);
+                bool selected = pc != null && pc.SelectedShape == shape;
+                UIFactory.Tile(content, caption, new Color(0.86f, 0.87f, 0.89f), new Vector2(148f, 104f),
+                    () => { pc?.SetShape(s); pc?.SelectTool(ToolId.Spawn); ShowPage(Page.Materials); },
+                    glyph: glyph, selected: selected);
             }
 
-            var db = Game.I.Materials;
             int count = 0;
-            foreach (var group in db.All.GroupBy(m => m.category).OrderBy(g => g.Key))
+            foreach (var group in Game.I.Materials.All.GroupBy(m => m.category).OrderBy(g => g.Key))
             {
+                // заголовок категории занимает всю строку
+                var header = UIFactory.Label(content, CategoryName(group.Key).ToUpperInvariant(), Theme.FontTiny,
+                    Theme.Accent, TextAnchor.MiddleLeft);
+                var le = header.gameObject.AddComponent<LayoutElement>();
+                le.preferredWidth = 148f * 3 + 10f;
+                le.preferredHeight = 18f;
+                header.gameObject.AddComponent<CategoryRow>();
+
                 foreach (var m in group.OrderByDescending(m => m.hardness))
                 {
                     var mat = m;
                     bool selected = pc != null && pc.SelectedMaterial != null && pc.SelectedMaterial.id == mat.id;
-                    Card(content, mat.nameRu,
-                         $"{mat.density:F0} кг/м³ · HB {mat.hardness:F0}",
-                         mat.color,
-                         () => { pc.SetMaterial(mat); pc.SelectTool(ToolId.Spawn); ShowPage(Page.Materials); },
-                         selected);
+                    UIFactory.Tile(content, mat.nameRu, mat.color, new Vector2(148f, 104f),
+                        () => { pc?.SetMaterial(mat); pc?.SelectTool(ToolId.Spawn); ShowPage(Page.Materials); },
+                        badge: $"{mat.density:F0}", selected: selected);
                     count++;
                 }
             }
-            _footer.text = $"{count} материалов · {CategoryName(pc?.SelectedShape)} · колесо мыши — зум";
+            _footer.text = $"{count} материалов · колесо — зум · [ ] — размер штампа";
         }
 
         void BuildWeapons(RectTransform parent)
         {
             var pc = Pc;
-            var content = Grid(parent, 2, 210f, 58f, out _);
+            var content = Grid(parent, 3, 148f, 104f, out _);
+            _pageTitle.text = "ОРУЖИЕ";
             int count = 0;
             foreach (var group in Game.I.Weapons.All.GroupBy(w => w.category).OrderBy(g => CategoryOrder(g.Key)))
             {
+                var header = UIFactory.Label(content, WeaponCategoryName(group.Key).ToUpperInvariant(), Theme.FontTiny,
+                    Theme.Accent, TextAnchor.MiddleLeft);
+                header.gameObject.AddComponent<LayoutElement>().preferredWidth = 148f * 3 + 10f;
+                header.gameObject.AddComponent<CategoryRow>();
+
                 foreach (var w in group.OrderBy(w => w.massGrams))
                 {
                     var weapon = w;
                     bool selected = pc != null && pc.Weapons.Current != null && pc.Weapons.Current.id == weapon.id;
-                    var cat = weapon.category switch
-                    {
-                        "melee" => "ближний бой",
-                        "thrown" => $"{weapon.massGrams:F0} г · бросок",
-                        "bow" => "стрелы",
-                        "heavy" => "тяжёлое",
-                        "energy" => "энергия",
-                        _ => $"{weapon.caliberMM:F1} мм · {weapon.rpm:F0} в/мин",
-                    };
-                    Card(content, weapon.nameRu, cat,
-                         WeaponColor(weapon.category),
-                         () => { pc.SetWeapon(weapon); pc.SelectTool(ToolId.Weapon); ShowPage(Page.Weapons); },
-                         selected);
+                    UIFactory.Tile(content, weapon.nameRu, WeaponColor(weapon.category), new Vector2(148f, 104f),
+                        () => { pc?.SetWeapon(weapon); pc?.SelectTool(ToolId.Weapon); ShowPage(Page.Weapons); },
+                        badge: weapon.caliberMM > 0.1f ? $"{weapon.caliberMM:F0}" : null, selected: selected);
                     count++;
                 }
             }
-            _footer.text = $"{count} единиц оружия · Z/X — переключение · ПКМ — панорама";
+            _footer.text = $"{count} единиц · Z/X — переключить · ЛКМ — выстрел";
         }
+
+        static string WeaponCategoryName(string cat) => cat switch
+        {
+            "melee" => "Ближний бой",
+            "thrown" => "Метательное",
+            "bow" => "Луки",
+            "pistol" => "Пистолеты",
+            "smg" => "ПП",
+            "rifle" => "Винтовки",
+            "shotgun" => "Дробовики",
+            "sniper" => "Снайперские",
+            "heavy" => "Тяжёлое",
+            "explosive" => "Взрывчатка",
+            "launcher" => "Гранатомёты",
+            "flame" => "Огнемёты",
+            _ => cat,
+        };
 
         static Color WeaponColor(string cat) => cat switch
         {
-            "melee" => new Color(0.75f, 0.35f, 0.35f),
-            "thrown" => new Color(0.85f, 0.6f, 0.25f),
-            "bow" => new Color(0.55f, 0.7f, 0.35f),
-            "heavy" => new Color(0.9f, 0.45f, 0.2f),
-            "energy" => new Color(0.35f, 0.8f, 0.95f),
-            _ => new Color(0.6f, 0.65f, 0.75f),
+            "melee" => new Color(0.86f, 0.80f, 0.72f),
+            "thrown" => new Color(0.92f, 0.84f, 0.55f),
+            "bow" => new Color(0.80f, 0.86f, 0.62f),
+            "heavy" => new Color(0.90f, 0.66f, 0.42f),
+            "energy" => new Color(0.55f, 0.88f, 0.96f),
+            "explosive" => new Color(0.95f, 0.55f, 0.42f),
+            _ => new Color(0.78f, 0.80f, 0.84f),
         };
 
         static int CategoryOrder(string cat) => cat switch
@@ -312,13 +352,15 @@ namespace Elementa
         void BuildNpcs(RectTransform parent)
         {
             var pc = Pc;
-            var content = Grid(parent, 2, 210f, 58f, out _);
+            var content = Grid(parent, 2, 226f, 118f, out _);
+            _pageTitle.text = "ЖИВЫЕ";
             foreach (var kind in new[] { NpcActor.NpcKind.Human, NpcActor.NpcKind.Heavy, NpcActor.NpcKind.Scientist, NpcActor.NpcKind.Zombie, NpcActor.NpcKind.Robot })
             {
                 var k = kind;
                 bool selected = pc != null && pc.SelectedNpcKind == kind;
-                Card(content, NpcName(kind), NpcDesc(kind), NpcColor(kind),
-                     () => { pc.SetNpcKind(k); pc.SelectTool(ToolId.Npc); ShowPage(Page.Npc); }, selected);
+                UIFactory.Tile(content, NpcName(kind), NpcColor(kind), new Vector2(226f, 118f),
+                    () => { pc?.SetNpcKind(k); pc?.SelectTool(ToolId.Npc); ShowPage(Page.Npc); },
+                    badge: $"{NpcDesc(kind)}", selected: selected, glyph: "☺");
             }
             _footer.text = "Клик по сцене ставит персонажа · рагдолл физический";
         }
@@ -335,75 +377,70 @@ namespace Elementa
 
         static string NpcDesc(NpcActor.NpcKind k) => k switch
         {
-            NpcActor.NpcKind.Human => "100 HP · обычный",
-            NpcActor.NpcKind.Heavy => "320 HP · тяжёлый",
-            NpcActor.NpcKind.Scientist => "65 HP · хрупкий",
-            NpcActor.NpcKind.Zombie => "160 HP · горит хуже",
-            NpcActor.NpcKind.Robot => "420 HP · металл",
+            NpcActor.NpcKind.Human => "100 HP",
+            NpcActor.NpcKind.Heavy => "320 HP",
+            NpcActor.NpcKind.Scientist => "65 HP",
+            NpcActor.NpcKind.Zombie => "160 HP",
+            NpcActor.NpcKind.Robot => "420 HP",
             _ => ""
         };
 
         static Color NpcColor(NpcActor.NpcKind k) => k switch
         {
-            NpcActor.NpcKind.Human => new Color(0.82f, 0.64f, 0.50f),
-            NpcActor.NpcKind.Heavy => new Color(0.72f, 0.55f, 0.42f),
-            NpcActor.NpcKind.Scientist => new Color(0.92f, 0.93f, 0.95f),
-            NpcActor.NpcKind.Zombie => new Color(0.45f, 0.60f, 0.38f),
-            NpcActor.NpcKind.Robot => new Color(0.55f, 0.60f, 0.68f),
+            NpcActor.NpcKind.Human => new Color(0.86f, 0.72f, 0.58f),
+            NpcActor.NpcKind.Heavy => new Color(0.78f, 0.64f, 0.50f),
+            NpcActor.NpcKind.Scientist => new Color(0.93f, 0.94f, 0.96f),
+            NpcActor.NpcKind.Zombie => new Color(0.58f, 0.72f, 0.48f),
+            NpcActor.NpcKind.Robot => new Color(0.66f, 0.70f, 0.78f),
             _ => Color.gray
         };
 
         void BuildFluids(RectTransform parent)
         {
             var pc = Pc;
-            var content = Grid(parent, 2, 210f, 58f, out _);
+            var content = Grid(parent, 3, 148f, 104f, out _);
+            _pageTitle.text = "ЖИДКОСТИ И ВЕЩЕСТВА";
             int count = 0;
             foreach (var s in Game.I.Substances.All.OrderBy(s => s.phase).ThenBy(s => s.nameRu))
             {
                 var sub = s;
                 bool selected = pc != null && pc.SelectedSubstance != null && pc.SelectedSubstance.id == sub.id;
-                Card(content, sub.nameRu,
-                     $"{sub.formula} · pH {sub.ph:F0} · {PhaseName(sub.phase)}",
-                     sub.color,
-                     () => { pc.SetSubstance(sub); pc.SelectTool(ToolId.Fluid); ShowPage(Page.Fluids); },
-                     selected);
+                bool solid = sub.phase == Sim.Phase.Solid;
+                UIFactory.Tile(content, sub.nameRu, sub.color, new Vector2(148f, 104f),
+                    () => { pc?.SetSubstance(sub); pc?.SelectTool(ToolId.Fluid); ShowPage(Page.Fluids); },
+                    badge: solid ? "порошок" : sub.formula, selected: selected, glyph: solid ? "▨" : "◍");
                 count++;
             }
             _footer.text = $"{count} веществ · клик по ёмкости — налить, по пустому месту — колба";
         }
 
-        static string PhaseName(Sim.Phase p) => p switch
-        {
-            Sim.Phase.Gas => "газ",
-            Sim.Phase.Solid => "порошок",
-            _ => "жидкость"
-        };
-
         void BuildScenes(RectTransform parent)
         {
-            var content = Grid(parent, 1, 430f, 62f, out _);
+            var content = Grid(parent, 1, 452f, 86f, out _);
+            _pageTitle.text = "СЦЕНЫ";
             foreach (var scenario in ScenarioLibrary.All())
             {
                 var sc = scenario;
-                Card(content, sc.nameRu, sc.description, Theme.AccentDim, () =>
+                UIFactory.Tile(content, sc.nameRu, Theme.AccentDim, new Vector2(452f, 86f), () =>
                 {
                     Game.I.World.ClearAll();
                     sc.Build(Game.I.World);
                     Game.I.CameraRig.ResetView();
-                    Game.I.UI?.Log("Сцена: " + sc.nameRu);
-                });
+                    _ui?.Log("Сцена: " + sc.nameRu);
+                }, badge: sc.description);
             }
             _footer.text = "Сцена заменяет всё содержимое мира";
         }
 
-        static string CategoryName(BodyShape? shape) => shape switch
+        static string CategoryName(string cat) => cat switch
         {
-            BodyShape.Box => "куб",
-            BodyShape.Plate => "плита",
-            BodyShape.Sphere => "шар",
-            BodyShape.Cylinder => "цилиндр",
-            BodyShape.Capsule => "капсула",
-            _ => "куб"
+            "metal" => "Металлы",
+            "ceramic" => "Керамика",
+            "mineral" => "Минералы",
+            "polymer" => "Полимеры",
+            "wood" => "Дерево",
+            "organic" => "Органика",
+            _ => cat,
         };
 
         public void Update()
@@ -411,12 +448,6 @@ namespace Elementa
             var pc = Pc;
             if (pc == null) return;
             RefreshToolHighlight();
-            if (_footer != null && _current == Page.Materials && pc.SelectedMaterial != null)
-            {
-                // показываем выбранный материал и размер штампа
-                if (Time.frameCount % 15 == 0)
-                    _footer.text = $"Выбрано: {pc.SelectedMaterial.nameRu} · масштаб x{pc.SpawnScale:0.00} · [ ] меняет размер";
-            }
         }
     }
 
@@ -424,4 +455,7 @@ namespace Elementa
     {
         public InventoryPanel.Page Page;
     }
+
+    /// <summary>Маркер строки-заголовка категории внутри сетки (чтобы не удалить её при смене страницы).</summary>
+    public class CategoryRow : MonoBehaviour { }
 }
