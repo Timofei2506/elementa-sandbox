@@ -1,7 +1,11 @@
 name: Unity license
 
-# Лицензия Unity для облачной сборки. Файл .alf генерируется официальным образом Unity
-# напрямую (старый action game-ci/unity-request-activation-file больше не поддерживается).
+# Лицензия Unity для облачной сборки.
+#  * request-file  — генерирует .alf официальным образом Unity (старый
+#                    game-ci/unity-request-activation-file больше не поддерживается)
+#  * check-license — проверяет секреты UNITY_EMAIL / UNITY_PASSWORD / UNITY_LICENSE
+#                    в контейнере GameCI и печатает диагностику
+# Полная инструкция: docs/UNITY_LICENSE_CI.md
 
 on:
   workflow_dispatch:
@@ -33,6 +37,9 @@ jobs:
         run: |
           set -euo pipefail
           mkdir -p out
+          # Unity игнорирует -manualLicenseFile как каталог назначения и пишет
+          # .alf в свой рабочий каталог, поэтому запускаем процесс внутри
+          # примонтированной папки и потом копируем найденный файл.
           docker run --rm --entrypoint "" \
             -w /artifacts \
             -v "$PWD/out:/artifacts" \
@@ -41,15 +48,13 @@ jobs:
             bash -lc 'unity-editor -batchmode -nographics -logFile /dev/stdout \
                        -createManualActivationFile -manualLicenseFile /artifacts/Unity.alf || true; \
                       cp -v /*.alf /artifacts/ 2>/dev/null || true'
-          # Unity игнорирует указанный путь и пишет .alf в свой рабочий каталог —
-          # запускаем в примонтированной папке и ищем файл по всему контейнеру
           ls -la out
           if ls out/*.alf >/dev/null 2>&1; then
-            echo "::notice::.alf создан"
+            echo "::notice::.alf создан: $(ls out/*.alf)"
           else
-            echo "::warning::Файл .alf не найден в out/"
+            echo "::error::.alf не найден — см. лог контейнера выше"
+            exit 1
           fi
-          ls -la out
 
       - name: Выложить .alf
         if: always()
@@ -59,3 +64,57 @@ jobs:
           path: out/
           retention-days: 7
           if-no-files-found: warn
+
+  check-license:
+    name: Проверить лицензию
+    if: github.event.inputs.action == 'check-license'
+    runs-on: ubuntu-latest
+    timeout-minutes: 40
+    env:
+      UNITY_LICENSE: ${{ secrets.UNITY_LICENSE }}
+      UNITY_EMAIL: ${{ secrets.UNITY_EMAIL }}
+      UNITY_PASSWORD: ${{ secrets.UNITY_PASSWORD }}
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Есть ли секреты
+        id: pre
+        run: |
+          missing=""
+          [ -z "$UNITY_LICENSE" ] && missing="$missing UNITY_LICENSE"
+          [ -z "$UNITY_EMAIL" ]   && missing="$missing UNITY_EMAIL"
+          [ -z "$UNITY_PASSWORD" ] && missing="$missing UNITY_PASSWORD"
+          if [ -n "$missing" ]; then
+            echo "::error::Не заданы секреты:$missing — инструкция: docs/UNITY_LICENSE_CI.md"
+            echo "ok=false" >> "$GITHUB_OUTPUT"
+            exit 1
+          fi
+          echo "ok=true" >> "$GITHUB_OUTPUT"
+
+      - name: Разбор содержимого .ulf
+        run: |
+          set +e
+          echo "длина UNITY_LICENSE: ${#UNITY_LICENSE} символов"
+          echo "первая строка: $(printf '%s' "$UNITY_LICENSE" | head -c 120)"
+          printf '%s' "$UNITY_LICENSE" | grep -oE 'StartDate Value="[^"]*"|StopDate Value="[^"]*"|UpdateDate Value="[^"]*"|Serial Masked="[^"]*"' | sed 's/^/  /'
+          if ! printf '%s' "$UNITY_LICENSE" | grep -qi 'stopdate'; then
+            echo "::warning::В .ulf нет даты окончания (StopDate) — возможно, это бессрочная лицензия, но проверь, что скопирован весь XML"
+          fi
+
+      - name: Активация в контейнере GameCI
+        uses: game-ci/unity-activate@v2
+        env:
+          UNITY_LICENSE: ${{ secrets.UNITY_LICENSE }}
+          UNITY_EMAIL: ${{ secrets.UNITY_EMAIL }}
+          UNITY_PASSWORD: ${{ secrets.UNITY_PASSWORD }}
+
+      # unity-activate намеренно не возвращает лицензию сам, поэтому возвращаем её
+      # вручную, чтобы не занимать единственное место Personal-лицензии.
+      - name: Вернуть лицензию
+        if: always()
+        continue-on-error: true
+        uses: game-ci/unity-return-license@v2
+        env:
+          UNITY_LICENSE: ${{ secrets.UNITY_LICENSE }}
+          UNITY_EMAIL: ${{ secrets.UNITY_EMAIL }}
+          UNITY_PASSWORD: ${{ secrets.UNITY_PASSWORD }}
