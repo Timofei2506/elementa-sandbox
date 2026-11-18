@@ -5,27 +5,22 @@
 | Workflow | Что делает | Секреты |
 |---|---|---|
 | `.github/workflows/test.yml` | валидация данных, статические проверки, **77 тестов** физики/химии | не нужны |
-| `.github/workflows/build-unity.yml` | собирает **Windows `.exe`** и **Android `.apk`** через GameCI | `UNITY_LICENSE`, `UNITY_EMAIL`, `UNITY_PASSWORD` |
+| `.github/workflows/build-unity.yml` | собирает **Windows `.exe`** и **Android `.apk`** через GameCI | `UNITY_EMAIL`, `UNITY_PASSWORD` |
 
 Тестовый workflow работает сразу. Билд-воркфлоу без секретов не падает: он честно пишет
 предупреждение в лог и пропускает сборку Unity.
 
 ---
 
-## 1. Получить лицензию Unity для CI (один раз, ~5 минут)
+## 1. Лицензия Unity для CI
 
-1. Установи **Unity Hub** и войди тем аккаунтом, от которого будешь собирать.
-   Лучше завести **отдельный аккаунт для CI**, чтобы не выбивать себя из локальной сессии.
-2. В Hub: **Preferences → Licenses → Add → Get a free personal license**.
-   Важно нажать **Add** и пройти активацию — иначе файл лицензии не создастся.
-3. Забери файл лицензии:
-   * **Windows:** `C:\ProgramData\Unity\Unity_lic.ulf`
-   * **macOS:** `/Library/Application Support/Unity/Unity_lic.ulf`
-   * **Linux:** `~/.local/share/unity3d/Unity/Unity_lic.ulf`
-4. Выйди из аккаунта в Hub (это возвращает место лицензии, чтобы CI смог занять его).
+Unity **отменила offline-активацию Personal-лицензий**: файлы `.alf`/`.ulf` больше не выпускаются,
+а `.ulf` из Unity Hub привязан к машине и в облаке отклоняется. Поэтому лицензия получается
+автоматически по логину и паролю аккаунта (Unity licensing client через game-ci CLI).
+Подробный разбор: **[UNITY_LICENSE_CI.md](UNITY_LICENSE_CI.md)**.
 
-> Если файла нет: `Unity -quit -batchmode -createManualActivationFile` создаст `.alf`,
-> загрузи его на https://license.unity3d.com/manual и скачай `.ulf`.
+Что нужно один раз: отключить в аккаунте 2FA, взять пароль без спецсимволов и освободить
+старые активации на [id.unity.com](https://id.unity.com/) (*Seats / Activations*).
 
 ## 2. Добавить секреты
 
@@ -33,7 +28,6 @@ GitHub → репозиторий → **Settings → Secrets and variables → A
 
 | Имя | Значение |
 |---|---|
-| `UNITY_LICENSE` | **всё содержимое** файла `Unity_lic.ulf` (открыть блокнотом, скопировать целиком, вместе с `<?xml ...>` и закрывающим тегом) |
 | `UNITY_EMAIL` | e-mail аккаунта Unity |
 | `UNITY_PASSWORD` | пароль **без спецсимволов** (GameCI не любит `"`, `\`, `$`) |
 
@@ -64,8 +58,8 @@ GitHub → репозиторий → **Settings → Secrets and variables → A
 
 | Ошибка в логе | Причина и решение |
 |---|---|
-| `No valid Unity Editor license found` | неверный/просроченный `UNITY_LICENSE`; перегенерируй `.ulf` и обнови секрет |
-| `Invalid serial` / `Activation failed` | занято место лицензии: выйди из Unity Hub, где она активирована |
+| `Invalid credentials` / `Machine bindings don't match` | неверный пароль, включена 2FA или остался старый секрет `UNITY_LICENSE` — удали его |
+| `no seats available` | заняты все места аккаунта: сними старые активации на id.unity.com |
 | `No space left on device` | образ Android большой; шаг «Освободить диск» уже есть, при повторе уменьши `Library`-кэш |
 | `Android build requires IL2CPP` | не применяется автонастройка — прогони меню **ELEMENTA → 2. Проверить проект** локально |
 | `Shader 'Standard' not found` | сработал strip: автонастройка должна была добавить его в Always Included, проверь `ProjectSettings/GraphicsSettings.asset` |

@@ -1,117 +1,85 @@
 # Лицензия Unity для сборки в облаке (Personal, бесплатно)
 
-Сборка `.exe`/`.apk` идёт в GitHub Actions (GameCI). Для неё нужна **активная лицензия**:
-логина и пароля недостаточно — Unity требует файл `.ulf`. Есть два пути, оба бесплатные.
+**Коротко:** нужны **два секрета** — `UNITY_EMAIL` и `UNITY_PASSWORD`. Файл лицензии
+`.ulf` больше не нужен и не поможет: Unity **отменила offline-активацию Personal-лицензий**
+(страница `license.unity3d.com/manual` теперь пишет «Offline activation is available only for
+Enterprise and Industry seats», а `.alf`/`.ulf` для бесплатной лицензии получить нельзя).
 
-| Путь | Что делаешь | Что получаешь |
-|---|---|---|
-| **A. Через Actions (быстрее)** | запускаешь workflow `Unity license` → `request-file`, качаешь `.alf`, загружаешь его на страницу Unity | `.ulf` за 2 минуты в браузере |
-| **B. Через Unity Hub (надёжнее)** | ставишь Unity Hub, входишь под аккаунтом для CI, «Get a free personal license» | `Unity_lic.ulf` уже лежит на диске, никуда загружать не надо |
+Как это работает в CI: `game-ci` CLI сам просит место у службы лицензий Unity через
+Unity licensing client (`--activate-all --include-personal`), используя логин и пароль
+аккаунта, и возвращает место в конце работы.
 
-В обоих случаях в GitHub нужны **три секрета**: `UNITY_LICENSE`, `UNITY_EMAIL`, `UNITY_PASSWORD`.
+### Почему нельзя по-старому
+
+| Путь | Что происходит |
+|---|---|
+| `.alf` → `license.unity3d.com/manual` → `.ulf` | страница отвечает «Offline activation is available only for Enterprise and Industry seats» — для Personal закрыто |
+| `.ulf` из Unity Hub → секрет `UNITY_LICENSE` | файл привязан к машине, которая его создала; в облаке Unity отвечает `Machine bindings don't match` (код 400) |
+| `-manualLicenseFile` с тем же `.ulf` | та же ошибка привязки |
+| **`UNITY_EMAIL` + `UNITY_PASSWORD`** | **работает**: CI получает место на время джобы и возвращает его |
 
 ---
 
-## Шаг 1. Добавь e-mail и пароль
+## Шаг 1. Подготовь аккаунт Unity
 
-GitHub → репозиторий → **Settings → Secrets and variables → Actions → New repository secret**:
+1. Аккаунт на [id.unity.com](https://id.unity.com/) (бесплатный, Personal).
+2. **Отключи двухфакторную аутентификацию (2FA)** — headless-активация не умеет её проходить.
+   Если 2FA включена, CI упадёт с ошибкой входа.
+3. Пароль лучше сделать **без спецсимволов** (`"`, `\`, `$` ломают передачу в контейнер):
+   смешанный регистр + цифры.
+4. Освободи место: [id.unity.com](https://id.unity.com/) → *Seats / Activations* → снять старые
+   активации. У Personal их всего несколько, а после каждого прогона CI место возвращается,
+   но зависшие прогоны могут оставить место занятым.
+
+## Шаг 2. Добавь два секрета
+
+Прямая ссылка: **<https://github.com/Timofei2506/elementa-sandbox/settings/secrets/actions/new>**
 
 | Имя | Значение |
 |---|---|
 | `UNITY_EMAIL` | e-mail аккаунта Unity |
-| `UNITY_PASSWORD` | пароль **без спецсимволов** (`"`, `\`, `$` ломают GameCI) |
+| `UNITY_PASSWORD` | пароль этого аккаунта |
 
-`UNITY_LICENSE` пока не добавляй — его получим на шаге 2.
+`UNITY_LICENSE` **не нужен** — если он у тебя уже есть в секретах, его можно удалить.
 
-> Хочешь отдельный «сервисный» аккаунт только для CI — так безопаснее: основной аккаунт
-> останется только у тебя, и сборка не будет отбирать место у твоей локальной Unity.
+## Шаг 3. Проверь лицензию
 
-## Шаг 2 (вариант A). Файл `.alf` из Actions
+**Actions → Unity license → Run workflow**.
 
-1. **Actions → Unity license → Run workflow**
-2. `action` = **request-file** → **Run workflow**
-3. Дождись зелёной галочки (~2–3 минуты: сначала качается образ Unity ~4 ГБ)
-4. Внизу страницы запуска → **Artifacts** → **Unity-Activation-File**
-   (внутри `Unity_v6000.0.85f2.alf`)
+Workflow печатает логин и длину пароля, ставит `game-ci` CLI, вызывает
+`game-ci activate .` (получение места) и в конце всегда делает `game-ci return-license .`.
 
-Артефакт хранится 7 дней — скачай сразу.
+* зелёная галочка → лицензия работает;
+* `Invalid credentials` → неверный e-mail/пароль или 2FA;
+* `no seats available` → освободи места в Unity ID (шаг 1.4).
 
-## Шаг 2 (вариант B). Файл `.ulf` из Unity Hub
+## Шаг 4. Собери `.exe` и `.apk`
 
-1. Скачай и поставь [Unity Hub](https://unity.com/download)
-2. Войди под **тем же** аккаунтом, чьи e-mail/пароль в секретах
-3. `Preferences` → `Licenses` → **Add** → **Get a free personal license**
-   (важно именно нажать **Add** — иначе файл может не создаться)
-4. Забери файл лицензии:
-   * Windows: `C:\ProgramData\Unity\Unity_lic.ulf`
-   * macOS: `/Library/Application Support/Unity/Unity_lic.ulf`
-   * Linux: `~/.local/share/unity3d/Unity/Unity_lic.ulf`
-5. **Выйди из Unity Hub** (это возвращает место лицензии, чтобы CI его получил)
-
-## Шаг 3. Получи `.ulf` в браузере (только для варианта A)
-
-1. Открой **https://license.unity3d.com/manual**
-2. Загрузи `.alf` из шага 2
-3. Выбери **Unity Personal** → «I don't use Unity in a professional capacity» →
-   категорию дохода (до 100 000 $) → **Next**
-4. Скачай файл **`.ulf`** (например `Unity_v6000.x.ulf`)
-
-Если страница пишет, что файл не подходит или «no seats» — просто используй вариант B.
-
-## Шаг 4. Добавь `.ulf` в секреты
-
-1. Открой `.ulf` блокнотом — это обычный XML (одна строка, начинается с `<?xml`)
-2. Скопируй **всё содержимое** целиком, до последнего `</root>`
-3. GitHub → Settings → Secrets → **New repository secret**
-   * Name: `UNITY_LICENSE`
-   * Secret: вставь скопированный XML
-
-## Шаг 5. Проверь лицензию
-
-**Actions → Unity license → Run workflow → action = check-license → Run**.
-
-Что делает проверка: печатает длину и даты из `.ulf`, затем активирует лицензию в
-контейнере `unityci/editor` через `game-ci/unity-activate` и возвращает место обратно.
-Зелёная галочка = лицензия рабочая.
-
-## Шаг 6. Собери `.exe` и `.apk`
-
-**Actions → Build (Unity) → Run workflow** (или просто пуш в `main`).
+**Actions → Build (Unity) → Run workflow** (или обычный пуш в `main`).
 
 Через ~15–25 минут внизу запуска появятся артефакты:
 
 * `ELEMENTA-StandaloneWindows64` — папка с `ELEMENTA.exe`
 * `ELEMENTA-Android` — `ELEMENTA.apk`
 
-При пуше тега вида `v1.0.0` оба файла дополнительно прикрепляются к GitHub Release.
+При пуше тега вида `v1.0.0` оба архива дополнительно прикрепляются к GitHub Release.
 
 ---
 
-## Важно про места лицензии
-
-У Personal-лицензии одно «место». Если Unity Hub открыт у тебя на компьютере под тем же
-аккаунтом, CI может не получить место:
-
-* выйди из Unity Hub на ПК, пока идёт сборка, **или**
-* заведи отдельный аккаунт Unity только для CI (рекомендую).
-
-Слот освобождается в [Unity ID](https://id.unity.com/) → *Seats / Activations*.
-
 ## Если что-то пошло не так
 
-| Симптом | Решение |
+| Симптом | Причина и решение |
 |---|---|
-| `Unable to get a valid Unity license` | `UNITY_LICENSE` содержит не весь XML или файл от другой версии — повтори шаги 2–4 |
-| `Activation failed: no seats available` | выйди из Unity Hub на ПК, освободи слот в Unity ID |
-| `.alf` не создался | повтори запуск `request-file`; в логе контейнера видно причину |
-| `UNITY_PASSWORD` не принимается | смени пароль на буквы/цифры без спецсимволов |
-| Сборка падает на `Library`/`IL2CPP` | это уже не лицензия — смотри лог шага `Build project`, кэш `Library` чистится удалением кэша Actions |
+| `Offline activation is available only for Enterprise and Industry seats` | это и есть та самая страница `.alf` — она для Personal больше не работает, файлы не нужны |
+| `Machine bindings don't match` / код 400 | использован `.ulf` из Unity Hub — удали секрет `UNITY_LICENSE`, активация идёт по логину и паролю |
+| `Invalid credentials` / `Access token is unavailable` | неверный пароль, включена 2FA или в пароле спецсимволы |
+| `no seats available` | освободи активации на [id.unity.com](https://id.unity.com/) |
+| Прогон отменён на середине | место могло остаться занятым: запусти `Unity license` ещё раз — он вернёт место в конце, либо сними активацию вручную в Unity ID |
 
-## Альтернатива: лицензия без `.alf`/`.ulf`
+## Альтернатива: Unity Pro/Plus
 
-Если появится **Unity Pro/Plus** — вместо `.ulf` используются секреты
-`UNITY_SERIAL` (вида `XX-XXXX-XXXX-XXXX-XXXX-XXXX`) + `UNITY_EMAIL` + `UNITY_PASSWORD`,
-и вся возня с файлами активации не нужна.
+Если появится платная подписка — вместо логина/пароля используется серийный ключ:
+секрет `UNITY_SERIAL` (`XX-XXXX-XXXX-XXXX-XXXX-XXXX`) + `UNITY_EMAIL` + `UNITY_PASSWORD`.
 
 ## Не отправляй пароль в чат
 

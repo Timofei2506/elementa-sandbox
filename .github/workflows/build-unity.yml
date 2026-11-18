@@ -1,8 +1,8 @@
 name: Build (Unity)
 
 # Собирает Windows (.exe) и Android (.apk) в облаке GitHub Actions.
-# Требуются секреты: UNITY_LICENSE, UNITY_EMAIL, UNITY_PASSWORD
-# (см. docs/CI_BUILD.md — как получить .ulf для Personal-лицензии).
+# Требуются секреты: UNITY_EMAIL и UNITY_PASSWORD (файл .ulf больше не нужен:
+# Unity отменила offline-активацию Personal-лицензий). См. docs/UNITY_LICENSE_CI.md.
 
 on:
   push:
@@ -30,18 +30,13 @@ jobs:
     steps:
       - id: check
         env:
-          LICENSE: ${{ secrets.UNITY_LICENSE }}
           EMAIL: ${{ secrets.UNITY_EMAIL }}
           PASSWORD: ${{ secrets.UNITY_PASSWORD }}
           REQUESTED: ${{ github.event.inputs.platforms || 'all' }}
         run: |
           ready=true
-          if [ -z "$LICENSE" ]; then
-            echo "::warning::Секрет UNITY_LICENSE не задан — сборка Unity пропущена. Инструкция: docs/CI_BUILD.md"
-            ready=false
-          fi
           if [ -z "$EMAIL" ] || [ -z "$PASSWORD" ]; then
-            echo "::warning::Секреты UNITY_EMAIL / UNITY_PASSWORD не заданы — сборка Unity пропущена."
+            echo "::warning::Секреты UNITY_EMAIL / UNITY_PASSWORD не заданы — сборка Unity пропущена. Инструкция: docs/UNITY_LICENSE_CI.md"
             ready=false
           fi
           echo "ready=$ready" >> "$GITHUB_OUTPUT"
@@ -95,13 +90,12 @@ jobs:
 
       - name: Сборка Unity
         if: steps.gate.outputs.run == 'true'
-        uses: game-ci/unity-builder@v4
+        uses: game-ci/unity-builder@v6
         env:
-          UNITY_LICENSE: ${{ secrets.UNITY_LICENSE }}
           UNITY_EMAIL: ${{ secrets.UNITY_EMAIL }}
           UNITY_PASSWORD: ${{ secrets.UNITY_PASSWORD }}
         with:
-          unityVersion: 6000.0.85f2
+          cliVersion: v0.1.76
           targetPlatform: ${{ matrix.target }}
           versioning: Semantic
           allowDirtyBuild: true

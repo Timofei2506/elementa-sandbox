@@ -33,12 +33,11 @@
 
 | Secret | Что это | Как получить |
 |---|---|---|
-| `UNITY_LICENSE` | XML-файл лицензии (.ulf) | на Windows: `C:\ProgramData\Unity\Unity_lic.ulf`, на macOS: `~/Library/Application Support/Unity/Unity_lic.ulf` |
 | `UNITY_EMAIL` | e-mail аккаунта Unity | — |
 | `UNITY_PASSWORD` | пароль аккаунта Unity | — |
 
-Для Unity Personal лицензию получают командой
-`Unity -quit -batchmode -createManualActivationFile` и загрузкой `.alf` на https://license.unity3d.com/manual.
+Файл `.ulf` больше не нужен: Unity отменила offline-активацию Personal-лицензий, и CI получает
+место по логину/паролю. Подробности — [UNITY_LICENSE_CI.md](UNITY_LICENSE_CI.md).
 
 **Не отправляй пароль от Unity в чат.** Если когда-нибудь понадобится CI — заведи
 отдельный «сервисный» аккаунт Unity и храни его данные только в GitHub Secrets.

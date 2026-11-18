@@ -35,8 +35,9 @@
 ### Сборка в GitHub Actions (облако)
 
 Пуш в `main` → GitHub Actions собирает **Windows `.exe`** и **Android `.apk`**, файлы лежат
-в Artifacts запуска. Нужны 3 секрета: `UNITY_LICENSE`, `UNITY_EMAIL`, `UNITY_PASSWORD`
-(только для билда — тесты работают без них). Полная инструкция: **[docs/CI_BUILD.md](docs/CI_BUILD.md)**.
+в Artifacts запуска. Нужны 2 секрета: `UNITY_EMAIL` и `UNITY_PASSWORD` (Unity отменила
+offline-активацию Personal-лицензий, поэтому `.ulf` больше не нужен). Тесты работают вообще без секретов.
+Полная инструкция: **[docs/UNITY_LICENSE_CI.md](docs/UNITY_LICENSE_CI.md)**.
 
 ### Локальная сборка
 
