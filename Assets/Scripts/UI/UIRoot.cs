@@ -285,11 +285,10 @@ namespace Elementa
             var shortNames = new System.Collections.Generic.Dictionary<ToolId, string>
             {
                 { ToolId.Select, "Кур" }, { ToolId.SpawnMaterial, "Мат" }, { ToolId.SpawnFluid, "Жид" },
-                { ToolId.Shoot, "Огонь?" }, { ToolId.Ignite, "Подж" }, { ToolId.Heat, "Жар" },
+                { ToolId.Shoot, "Стрел" }, { ToolId.Ignite, "Подж" }, { ToolId.Heat, "Жар" },
                 { ToolId.Hammer, "Мол" }, { ToolId.SpawnNpc, "НПС" }, { ToolId.Delete, "Дел" },
                 { ToolId.TimeControl, "Вр" },
             };
-            shortNames[ToolId.Shoot] = "Стрел";
             for (int i = 0; i < ToolbarPanel.childCount; i++)
             {
                 var child = ToolbarPanel.GetChild(i) as RectTransform;
