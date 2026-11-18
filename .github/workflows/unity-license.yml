@@ -40,6 +40,9 @@ jobs:
             unity-editor -batchmode -nographics -logFile /dev/stdout \
               -createManualActivationFile -manualLicenseFile /artifacts/Unity_v6000.0.85f2.alf \
             || true
+          # Unity пишет файл в /artifacts внутри образа — копируем его в смонтированную папку
+          ALF=$(ls -1 /artifacts/*.alf 2>/dev/null | head -1 || true)
+          [ -n "$ALF" ] && cp "$ALF" out/ || echo "::error::Unity не создала .alf"
           ls -la out
 
       - name: Выложить .alf
