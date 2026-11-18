@@ -90,6 +90,55 @@ namespace Elementa
             return npc;
         }
 
+        // ---------------- 2D-хелперы поиска ----------------
+        // Камера ортографическая и смотрит по +Z, поэтому «что под курсором» считается
+        // простым расстоянием в плоскости X/Y — плоскость симуляции z = 0.
+        public SandboxObject ObjectAt(Vector3 point, float radius = 0.5f)
+        {
+            SandboxObject best = null;
+            float bestDist = float.MaxValue;
+            foreach (var o in Objects)
+            {
+                if (o == null) continue;
+                var p = o.transform.position;
+                float d = Vector2.Distance(new Vector2(p.x, p.y), new Vector2(point.x, point.y));
+                float extent = Mathf.Max(o.WorldSize.x, o.WorldSize.y) * 0.5f;
+                if (d > radius + extent) continue;
+                if (d < bestDist) { bestDist = d; best = o; }
+            }
+            return best;
+        }
+
+        public NpcActor NpcAt(Vector3 point, float radius = 0.7f)
+        {
+            NpcActor best = null;
+            float bestDist = float.MaxValue;
+            foreach (var n in Npcs)
+            {
+                if (n == null) continue;
+                var p = n.transform.position;
+                float d = Vector2.Distance(new Vector2(p.x, p.y), new Vector2(point.x, point.y));
+                if (d > radius + 0.9f) continue;
+                if (d < bestDist) { bestDist = d; best = n; }
+            }
+            return best;
+        }
+
+        public FluidContainer ContainerAt(Vector3 point, float radius = 0.8f)
+        {
+            FluidContainer best = null;
+            float bestDist = float.MaxValue;
+            foreach (var c in Containers)
+            {
+                if (c == null) continue;
+                var p = c.transform.position;
+                float d = Vector2.Distance(new Vector2(p.x, p.y), new Vector2(point.x, point.y));
+                if (d > radius) continue;
+                if (d < bestDist) { bestDist = d; best = c; }
+            }
+            return best;
+        }
+
         // ---------------- physics helpers ----------------
         /// <summary>Applies an explosion: radial impulse + damage falloff + fire ignition.</summary>
         public void Explode(Vector3 center, float powerGramsTNT, float igniteChance = 0.65f)
@@ -111,9 +160,10 @@ namespace Elementa
                 obj.ApplyDamage(dmg, joules * falloff * 0.1f / Mathf.Max(1f, Objects.Count));
                 if (obj.Body != null)
                 {
-                    var dir = (delta.normalized + Vector3.up * 0.55f).normalized;
+                    var flat = new Vector3(delta.x, delta.y, 0f);
+                    var dir = (flat.normalized + Vector3.up * 0.55f).normalized;
                     obj.Body.AddForce(dir * (powerGramsTNT * 0.9f * falloff) / Mathf.Max(0.3f, obj.Mass * 0.02f), ForceMode.Impulse);
-                    obj.Body.AddTorque(UnityEngine.Random.insideUnitSphere * powerGramsTNT * 0.02f * falloff, ForceMode.Impulse);
+                    obj.Body.AddTorque(new Vector3(0f, 0f, UnityEngine.Random.Range(-1f, 1f)) * powerGramsTNT * 0.02f * falloff, ForceMode.Impulse);
                 }
                 if (obj.Material.flammability > igniteChance * 0.5f && UnityEngine.Random.value < igniteChance * falloff)
                     obj.Ignite();
@@ -197,36 +247,32 @@ namespace Elementa
             BuildStarterScene();
         }
 
-        /// <summary>Default demo scene: platforms, crates, a wall, barrels, a chemistry bench.</summary>
+        /// <summary>Стартовая сцена: платформы, ящики, ёмкости и пара персонажей — всё в плоскости экрана.</summary>
         public void BuildStarterScene()
         {
-            Spawn("steel_1045", BodyShape.Plate, new Vector3(8f, 0.4f, 8f), new Vector3(0f, 0.2f, 0f));
-            Spawn("steel_hardened", BodyShape.Plate, new Vector3(0.5f, 2.2f, 7f), new Vector3(-5.5f, 1.2f, 0f));
-            Spawn("concrete", BodyShape.Plate, new Vector3(4f, 1.6f, 0.7f), new Vector3(6f, 1.0f, -4f));
-            Spawn("oak", BodyShape.Box, new Vector3(1f, 1f, 1f), new Vector3(-2.5f, 1.0f, -3f));
-            Spawn("oak", BodyShape.Box, new Vector3(1f, 1f, 1f), new Vector3(-2.5f, 2.1f, -3f));
-            Spawn("aluminium", BodyShape.Cylinder, new Vector3(0.9f, 1.3f, 0.9f), new Vector3(2.5f, 1.1f, 2.5f));
-            Spawn("kevlar", BodyShape.Plate, new Vector3(1.6f, 2f, 0.25f), new Vector3(-1f, 1.2f, 4f));
-            Spawn("ceramic_alumina", BodyShape.Plate, new Vector3(1.6f, 2f, 0.35f), new Vector3(1f, 1.2f, 4f));
-            Spawn("glass", BodyShape.Plate, new Vector3(2.5f, 2.5f, 0.15f), new Vector3(4.5f, 1.4f, 3f));
+            // пол и стены арены строит WorldEnvironment; здесь только объекты «на сцене»
+            Spawn("steel_1045", BodyShape.Plate, new Vector3(4.5f, 0.35f, 1f), new Vector3(-6f, 2.2f, 0f));
+            Spawn("steel_1045", BodyShape.Plate, new Vector3(4.5f, 0.35f, 1f), new Vector3(6f, 2.2f, 0f));
+            Spawn("concrete", BodyShape.Box, new Vector3(1f, 1f, 1f), new Vector3(-8.5f, 0.6f, 0f));
+            Spawn("concrete", BodyShape.Box, new Vector3(1f, 1f, 1f), new Vector3(-8.5f, 1.7f, 0f));
+            Spawn("oak", BodyShape.Box, new Vector3(1f, 1f, 1f), new Vector3(-7.5f, 0.6f, 0f));
+            Spawn("brick", BodyShape.Box, new Vector3(1f, 0.6f, 1f), new Vector3(-7.5f, 1.4f, 0f));
+            Spawn("aluminium", BodyShape.Cylinder, new Vector3(0.9f, 1.3f, 1f), new Vector3(9.5f, 0.8f, 0f));
+            Spawn("glass", BodyShape.Plate, new Vector3(1.8f, 2.4f, 0.4f), new Vector3(2.5f, 1.4f, 0f));
+            Spawn("kevlar", BodyShape.Plate, new Vector3(1.8f, 2.4f, 0.4f), new Vector3(4.2f, 1.4f, 0f));
+            Spawn("ceramic_alumina", BodyShape.Plate, new Vector3(1.8f, 2.4f, 0.4f), new Vector3(5.9f, 1.4f, 0f));
 
-            Spawn("steel_1045", BodyShape.Cylinder, new Vector3(0.9f, 1.2f, 0.9f), new Vector3(5f, 1.1f, -1.5f));
-            Spawn("titanium", BodyShape.Box, new Vector3(1.1f, 1.1f, 1.1f), new Vector3(-4.5f, 1.0f, -4.5f));
-            Spawn("brick", BodyShape.Plate, new Vector3(3f, 0.4f, 3f), new Vector3(0f, 0.65f, -1.5f));
-
-            var beaker = SpawnContainer(new Vector3(-3.4f, 0.9f, 3.2f), 6f);
+            var beaker = SpawnContainer(new Vector3(-3.4f, 0.7f, 0f), 6f);
             beaker.Fill("water", 2.0f);
-            var acidFlask = SpawnContainer(new Vector3(-1.6f, 0.9f, 3.6f), 5f);
+            var acidFlask = SpawnContainer(new Vector3(-2.0f, 0.7f, 0f), 5f);
             acidFlask.Fill("hcl", 1.5f);
-            var baseFlask = SpawnContainer(new Vector3(0.1f, 0.9f, 3.6f), 5f);
+            var baseFlask = SpawnContainer(new Vector3(-0.6f, 0.7f, 0f), 5f);
             baseFlask.Fill("naoh", 1.5f);
-            var fuelBarrel = SpawnContainer(new Vector3(1.8f, 0.9f, 3.6f), 8f);
+            var fuelBarrel = SpawnContainer(new Vector3(0.8f, 0.7f, 0f), 8f);
             fuelBarrel.Fill("gasoline", 3.0f);
 
-            var npc = SpawnNpc(new Vector3(3.5f, 1.2f, -2.5f));
-            npc.SetBehaviour(NpcActor.Behaviour.Idle);
-            var npc2 = SpawnNpc(new Vector3(-3.5f, 1.2f, -2.5f), NpcActor.NpcKind.Scientist);
-            npc2.SetBehaviour(NpcActor.Behaviour.Wander);
+            SpawnNpc(new Vector3(-1.5f, 1.0f, 0f)).SetBehaviour(NpcActor.Behaviour.Still);
+            SpawnNpc(new Vector3(1.5f, 1.0f, 0f), NpcActor.NpcKind.Scientist).SetBehaviour(NpcActor.Behaviour.Wander);
         }
 
         void LateUpdate()

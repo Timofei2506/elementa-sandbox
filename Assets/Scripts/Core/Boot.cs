@@ -57,10 +57,11 @@ namespace Elementa
             PlayerController.Create(world);
             world.BuildStarterScene();
 
+            rig.ResetView();
             if (game.IsMobile)
             {
-                rig.Distance = 20f;
-                ui.Log("Мобильная раскладка: один палец — вращение камеры, два пальца — зум.");
+                rig.OrthoSize = 14f;
+                ui.Log("Телефон: один палец — двигать сцену, два пальца — зум, панель снизу — инструменты.");
             }
         }
     }

@@ -6,107 +6,137 @@ using UnityEngine;
 namespace Elementa
 {
     /// <summary>
-    /// Sandbox NPC: a simple articulated figure with health, ragdoll death,
-    /// and pluggable behaviours (idle, wander, chase, flee, follow player cursor).
+    /// Персонаж-рагдолл в духе Melon Sandbox: набор связанных тел в плоскости экрана.
+    /// Части висят на суставах-шарнирах, отрываются от перегрузки, горят, истекают кровью
+    /// и складываются в кучу. Это не «ходячий актёр», а физический объект, которым играют.
     /// </summary>
     public class NpcActor : MonoBehaviour
     {
         public enum NpcKind { Human, Heavy, Scientist, Zombie, Robot }
-        public enum Behaviour { Idle, Wander, Follow, Chase, Flee, Panic }
+        public enum Behaviour { Still, Wander, Flee, Panic }
 
         public NpcKind Kind { get; private set; } = NpcKind.Human;
-        public Behaviour CurrentBehaviour { get; private set; } = Behaviour.Idle;
+        public Behaviour CurrentBehaviour { get; private set; } = Behaviour.Still;
         public float Health { get; private set; } = 100f;
         public float MaxHealth { get; private set; } = 100f;
         public float Temperature = 310f;
         public bool IsDead => Health <= 0f;
         public bool IsBurning { get; private set; }
-        public float Speed = 2.2f;
 
-        Rigidbody _rb;
-        Transform _head, _torso, _armL, _armR, _legL, _legR;
+        public class Limb
+        {
+            public string name;
+            public BodyPart part;
+            public float health = 1f;          // 0..1, 0 = оторван
+            public float maxImpulse = 1f;      // порог отрыва
+        }
+
+        readonly List<Limb> _limbs = new List<Limb>();
         SandboxWorld _world;
-        Vector3 _wanderTarget;
-        float _wanderTimer, _thinkTimer, _burnTimer;
-        CapsuleCollider _collider;
-        MaterialPropertyBlock _mpb;
-        readonly List<Renderer> _renderers = new List<Renderer>();
-        Color _skin, _shirt, _pants;
-        Vector3 _lastSafePos;
+        Rigidbody _root;
+        Color _skin, _cloth, _pants;
+        float _burnTimer, _bleed, _thinkTimer;
+        Vector3 _wanderTo;
+        float _wanderTimer;
+        Transform _marker;
 
         public event Action<NpcActor> OnDied;
 
         public static NpcActor Create(Transform parent, Vector3 position, NpcKind kind, SandboxWorld world)
         {
-            var go = new GameObject("NPC_" + kind);
+            var go = new GameObject("Ragdoll_" + kind);
             go.transform.SetParent(parent, false);
             go.transform.position = position;
-            go.layer = LayerMask.NameToLayer("Npc");
-
             var npc = go.AddComponent<NpcActor>();
             npc.Kind = kind;
             npc._world = world;
-            npc.Build(kind);
-
-            var rb = go.AddComponent<Rigidbody>();
-            rb.mass = kind switch { NpcKind.Heavy => 190f, NpcKind.Robot => 260f, NpcKind.Scientist => 65f, _ => 78f };
-            rb.drag = 0.4f;
-            rb.angularDrag = 0.6f;
-            rb.constraints = RigidbodyConstraints.FreezeRotationX | RigidbodyConstraints.FreezeRotationZ;
-            rb.collisionDetectionMode = CollisionDetectionMode.ContinuousDynamic;
-            npc._rb = rb;
-
-            var col = go.AddComponent<CapsuleCollider>();
-            col.height = kind == NpcKind.Heavy ? 2.2f : 1.85f;
-            col.radius = kind == NpcKind.Heavy ? 0.55f : 0.35f;
-            col.center = new Vector3(0f, col.height * 0.5f, 0f);
-            npc._collider = col;
-
-            npc.MaxHealth = kind switch { NpcKind.Heavy => 320f, NpcKind.Robot => 420f, NpcKind.Zombie => 160f, _ => 100f };
-            npc.Health = npc.MaxHealth;
-            npc._wanderTarget = position;
-            npc._lastSafePos = position;
+            npc.Build();
             return npc;
         }
 
-        void Build(NpcKind kind)
+        void Build()
         {
-            _mpb = new MaterialPropertyBlock();
-            switch (kind)
+            float scale = Kind == NpcKind.Heavy ? 1.35f : Kind == NpcKind.Robot ? 1.4f : 1f;
+            MaxHealth = Kind switch
             {
-                case NpcKind.Heavy: _skin = new Color(.72f, .55f, .42f); _shirt = new Color(.22f, .26f, .22f); _pants = new Color(.16f, .17f, .18f); break;
-                case NpcKind.Scientist: _skin = new Color(.86f, .68f, .55f); _shirt = new Color(.92f, .93f, .95f); _pants = new Color(.35f, .38f, .45f); break;
-                case NpcKind.Zombie: _skin = new Color(.45f, .6f, .38f); _shirt = new Color(.35f, .3f, .28f); _pants = new Color(.2f, .22f, .25f); break;
-                case NpcKind.Robot: _skin = new Color(.55f, .6f, .68f); _shirt = new Color(.3f, .42f, .52f); _pants = new Color(.22f, .25f, .3f); break;
-                default: _skin = new Color(.82f, .64f, .5f); _shirt = new Color(.28f, .42f, .62f); _pants = new Color(.2f, .22f, .28f); break;
+                NpcKind.Heavy => 320f,
+                NpcKind.Robot => 420f,
+                NpcKind.Zombie => 160f,
+                NpcKind.Scientist => 65f,
+                _ => 100f
+            };
+            Health = MaxHealth;
+
+            switch (Kind)
+            {
+                case NpcKind.Heavy: _skin = new Color(.72f, .55f, .42f); _cloth = new Color(.24f, .28f, .24f); _pants = new Color(.16f, .17f, .18f); break;
+                case NpcKind.Scientist: _skin = new Color(.86f, .68f, .55f); _cloth = new Color(.92f, .93f, .95f); _pants = new Color(.35f, .38f, .45f); break;
+                case NpcKind.Zombie: _skin = new Color(.45f, .60f, .38f); _cloth = new Color(.35f, .30f, .28f); _pants = new Color(.20f, .22f, .25f); break;
+                case NpcKind.Robot: _skin = new Color(.55f, .60f, .68f); _cloth = new Color(.30f, .42f, .52f); _pants = new Color(.22f, .25f, .30f); break;
+                default: _skin = new Color(.82f, .64f, .50f); _cloth = new Color(.28f, .42f, .62f); _pants = new Color(.20f, .22f, .28f); break;
             }
 
-            float scale = kind == NpcKind.Heavy ? 1.3f : kind == NpcKind.Robot ? 1.35f : 1f;
-            _torso = Part("Torso", PrimitiveType.Capsule, new Vector3(0f, 1.05f, 0f) * scale, new Vector3(0.5f, 0.42f, 0.36f) * scale, _shirt, Look.Polymer);
-            _head = Part("Head", PrimitiveType.Sphere, new Vector3(0f, 1.68f, 0f) * scale, Vector3.one * 0.26f * scale, _skin, Look.Flesh);
-            _armL = Part("ArmL", PrimitiveType.Capsule, new Vector3(-0.33f, 1.1f, 0f) * scale, new Vector3(0.14f, 0.36f, 0.14f) * scale, _shirt, Look.Polymer);
-            _armR = Part("ArmR", PrimitiveType.Capsule, new Vector3(0.33f, 1.1f, 0f) * scale, new Vector3(0.14f, 0.36f, 0.14f) * scale, _shirt, Look.Polymer);
-            _legL = Part("LegL", PrimitiveType.Capsule, new Vector3(-0.15f, 0.42f, 0f) * scale, new Vector3(0.16f, 0.42f, 0.16f) * scale, _pants, Look.Polymer);
-            _legR = Part("LegR", PrimitiveType.Capsule, new Vector3(0.15f, 0.42f, 0f) * scale, new Vector3(0.16f, 0.42f, 0.16f) * scale, _pants, Look.Polymer);
-            _armL.localRotation = Quaternion.Euler(0f, 0f, 12f);
-            _armR.localRotation = Quaternion.Euler(0f, 0f, -12f);
+            // ---- скелет в плоскости XY ----
+            var torso = AddLimb("Torso", new Vector3(0f, 1.05f, 0f) * scale, new Vector3(0.46f, 0.72f, 0.30f) * scale, _cloth, 4f, -0.12f);
+            _root = torso.part.Body;
+            AddLimb("Hips", new Vector3(0f, 0.62f, 0f) * scale, new Vector3(0.42f, 0.26f, 0.28f) * scale, _pants, 3.5f, 0.10f);
+            AddLimb("Head", new Vector3(0f, 1.55f, 0f) * scale, new Vector3(0.34f, 0.34f, 0.30f) * scale, _skin, 1.5f, -0.02f);
+            AddLimb("ArmL", new Vector3(-0.30f, 1.16f, 0f) * scale, new Vector3(0.15f, 0.60f, 0.22f) * scale, _cloth, 0.9f, 0.14f);
+            AddLimb("ArmR", new Vector3(0.30f, 1.16f, 0f) * scale, new Vector3(0.15f, 0.60f, 0.22f) * scale, _cloth, 0.9f, 0.14f);
+            AddLimb("LegL", new Vector3(-0.12f, 0.30f, 0f) * scale, new Vector3(0.20f, 0.62f, 0.24f) * scale, _pants, 1.4f, 0.18f);
+            AddLimb("LegR", new Vector3(0.12f, 0.30f, 0f) * scale, new Vector3(0.20f, 0.62f, 0.24f) * scale, _pants, 1.4f, 0.18f);
+
+            // ---- суставы: шарниры, чтобы рагдолл складывался, но не разваливался сам ----
+            foreach (var limb in _limbs)
+            {
+                if (limb.part == _limbs[0].part) continue;
+                Join(torso.part, limb.part);
+            }
+
+            _wanderTo = transform.position;
         }
 
-        Transform Part(string name, PrimitiveType type, Vector3 localPos, Vector3 scale, Color color, Look look)
+        Limb AddLimb(string name, Vector3 localPos, Vector3 scale, Color color, float mass, float maxImpulse)
         {
-            var go = GameObject.CreatePrimitive(type);
-            go.name = name;
+            var go = new GameObject(name);
             go.transform.SetParent(transform, false);
             go.transform.localPosition = localPos;
-            go.transform.localScale = scale;
-            go.layer = LayerMask.NameToLayer("Npc");
-            Destroy(go.GetComponent<Collider>());
-            var mr = go.GetComponent<MeshRenderer>();
-            mr.sharedMaterial = RuntimeVisuals.For(look, color, 0.65f, 0f);
+            // 2D: это плоская «деталь» персонажа
+            go.transform.localScale = new Vector3(scale.x, scale.y, Mathf.Max(0.2f, scale.z));
+            go.AddComponent<MeshFilter>().sharedMesh = RuntimeVisuals.Box;
+            var mr = go.AddComponent<MeshRenderer>();
+            mr.sharedMaterial = RuntimeVisuals.For(Kind == NpcKind.Robot ? Look.Metal : Look.Flesh, color, 0.72f, Kind == NpcKind.Robot ? 0.6f : 0f);
             mr.shadowCastingMode = UnityEngine.Rendering.ShadowCastingMode.On;
-            _renderers.Add(mr);
-            return go.transform;
+
+            var rb = go.AddComponent<Rigidbody>();
+            rb.mass = mass;
+            PhysicsCompat.SetLinearDamping(rb, 0.15f);
+            PhysicsCompat.SetAngularDamping(rb, 0.35f);
+            rb.constraints = RigidbodyConstraints.FreezePositionZ
+                           | RigidbodyConstraints.FreezeRotationX
+                           | RigidbodyConstraints.FreezeRotationY;
+            rb.collisionDetectionMode = CollisionDetectionMode.ContinuousDynamic;
+
+            var col = go.AddComponent<BoxCollider>();
+            col.size = Vector3.one;
+
+            var part = go.AddComponent<BodyPart>();
+            part.Init(this, name);
+            var limb = new Limb { name = name, part = part, maxImpulse = maxImpulse };
+            _limbs.Add(limb);
+            return limb;
         }
+
+        static void Join(BodyPart a, BodyPart b)
+        {
+            var joint = a.gameObject.AddComponent<HingeJoint>();
+            joint.connectedBody = b.Body;
+            joint.autoConfigureConnectedAnchor = true;
+            joint.useLimits = true;
+            joint.limits = new JointLimits { min = -120f, max = 120f };
+        }
+
+        public Rigidbody Body => _root;
 
         public void SetBehaviour(Behaviour b)
         {
@@ -116,146 +146,91 @@ namespace Elementa
 
         void PickWander()
         {
-            _wanderTarget = new Vector3(
-                UnityEngine.Random.Range(-WorldEnvironment.ArenaHalfSize * 0.78f, WorldEnvironment.ArenaHalfSize * 0.78f),
-                transform.position.y,
-                UnityEngine.Random.Range(-WorldEnvironment.ArenaHalfSize * 0.78f, WorldEnvironment.ArenaHalfSize * 0.78f));
-            _wanderTimer = UnityEngine.Random.Range(3f, 7f);
-        }
-
-        Transform _barBg, _barFill;
-        void EnsureHealthBar()
-        {
-            if (_barBg != null) return;
-            var canvasGo = new GameObject("HealthBar", typeof(Canvas));
-            canvasGo.transform.SetParent(transform, false);
-            var canvas = canvasGo.GetComponent<Canvas>();
-            canvas.renderMode = RenderMode.WorldSpace;
-            var rt = (RectTransform)canvasGo.transform;
-            rt.sizeDelta = new Vector2(120f, 18f);
-            rt.localPosition = new Vector3(0f, 2.35f, 0f);
-            rt.localScale = Vector3.one * 0.012f;
-
-            var bg = new GameObject("Bg", typeof(RectTransform));
-            bg.transform.SetParent(canvasGo.transform, false);
-            UIFactory.SetAnchors((RectTransform)bg.transform, Vector2.zero, Vector2.one, Vector2.zero, Vector2.zero);
-            var bgImg = bg.AddComponent<UnityEngine.UI.Image>();
-            bgImg.color = new Color(0.05f, 0.06f, 0.08f, 0.85f);
-
-            var fill = new GameObject("Fill", typeof(RectTransform));
-            fill.transform.SetParent(bg.transform, false);
-            UIFactory.SetAnchors((RectTransform)fill.transform, Vector2.zero, Vector2.one, new Vector2(2f, 2f), new Vector2(-2f, -2f));
-            var fillImg = fill.AddComponent<UnityEngine.UI.Image>();
-            fillImg.color = Theme.Accent;
-            fillImg.sprite = RuntimeVisuals.Rounded(32, 8);
-            fillImg.type = UnityEngine.UI.Image.Type.Filled;
-            fillImg.fillMethod = UnityEngine.UI.Image.FillMethod.Horizontal;
-            _barBg = bg.transform;
-            _barFill = fill.transform;
-        }
-
-        void UpdateHealthBar()
-        {
-            EnsureHealthBar();
-            if (_barFill == null) return;
-            float ratio = Mathf.Clamp01(Health / Mathf.Max(1f, MaxHealth));
-            var img = _barFill.GetComponent<UnityEngine.UI.Image>();
-            img.fillAmount = ratio;
-            img.color = ratio > 0.6f ? Theme.Accent : ratio > 0.3f ? Theme.Warn : Theme.Danger;
-            _barBg.parent.rotation = Camera.main != null ? Camera.main.transform.rotation : Quaternion.identity;
+            _wanderTo = new Vector3(
+                UnityEngine.Random.Range(-WorldEnvironment.ArenaHalfSize * 0.7f, WorldEnvironment.ArenaHalfSize * 0.7f),
+                0.4f, 0f);
+            _wanderTimer = UnityEngine.Random.Range(2.5f, 6f);
         }
 
         void Update()
         {
-            UpdateHealthBar();
-            if (IsDead) return;
             float dt = Time.deltaTime;
-
-            // animation: limb swing based on horizontal speed
-            float speed = _rb != null ? new Vector3(_rb.velocity.x, 0f, _rb.velocity.z).magnitude : 0f;
-            float swing = Mathf.Sin(Time.time * 9f) * Mathf.Clamp01(speed * 0.4f) * 42f;
-            if (_legL != null) _legL.localRotation = Quaternion.Euler(swing, 0f, 0f);
-            if (_legR != null) _legR.localRotation = Quaternion.Euler(-swing, 0f, 0f);
-            if (_armL != null) _armL.localRotation = Quaternion.Euler(-swing * 0.7f, 0f, 12f);
-            if (_armR != null) _armR.localRotation = Quaternion.Euler(swing * 0.7f, 0f, -12f);
-            if (_head != null) _head.localRotation = Quaternion.Euler(0f, Mathf.Sin(Time.time * 0.7f) * 6f, 0f);
+            if (IsDead)
+            {
+                _bleed -= dt * 0.4f;
+                if (_bleed <= 0f) { Die(); }
+                return;
+            }
 
             if (IsBurning)
             {
                 _burnTimer += dt;
-                Health -= 9f * dt;
+                Health -= 11f * dt;
                 Temperature = Mathf.Max(Temperature, 900f);
+                if (UnityEngine.Random.value < dt * 6f)
+                    EffectsSystem.SpawnSmoke(transform.position + Vector3.up * 0.8f, 0.5f, 0.8f, 0.5f);
                 if (Health <= 0f) Die();
-                if (_burnTimer > 7f) Extinguish();
             }
             else
             {
-                Temperature = Mathf.MoveTowards(Temperature, 310f, 12f * dt);
+                Temperature = Mathf.MoveTowards(Temperature, 310f, 14f * dt);
             }
 
             _thinkTimer -= dt;
             if (_thinkTimer <= 0f)
             {
-                _thinkTimer = 0.25f;
+                _thinkTimer = 0.22f;
                 Think();
             }
 
-            if (transform.position.y < -20f) Die();
+            // потеря конечностей превращается в кровотечение
+            if (_bleed > 0f)
+            {
+                Health -= _bleed * dt;
+                if (UnityEngine.Random.value < dt * 3f)
+                    EffectsSystem.SpawnFluidSplash(transform.position + Vector3.up * 0.3f, new Color(0.5f, 0.03f, 0.03f), 4, 1.6f);
+                if (Health <= 0f) Die();
+            }
+
+            if (transform.position.y < -25f) Die();
         }
 
         void Think()
         {
-            if (_rb == null) return;
             Vector3 desired = Vector3.zero;
             switch (CurrentBehaviour)
             {
                 case Behaviour.Wander:
-                    _wanderTimer -= 0.25f;
-                    if (_wanderTimer <= 0f || Vector3.Distance(transform.position, _wanderTarget) < 1.2f) PickWander();
-                    desired = (new Vector3(_wanderTarget.x, transform.position.y, _wanderTarget.z) - transform.position);
+                    _wanderTimer -= 0.22f;
+                    if (_wanderTimer <= 0f || Vector2.Distance(_wanderTo, transform.position) < 0.8f) PickWander();
+                    desired = _wanderTo - transform.position;
                     break;
-                case Behaviour.Follow:
-                case Behaviour.Chase:
-                    {
-                        var target = NearestTarget();
-                        if (target.HasValue) desired = target.Value - transform.position;
-                        break;
-                    }
                 case Behaviour.Flee:
                 case Behaviour.Panic:
-                    {
-                        var threat = NearestTarget();
-                        if (threat.HasValue) desired = transform.position - threat.Value;
-                        break;
-                    }
+                    desired = transform.position - NearestHazard();
+                    break;
             }
+            if (desired.sqrMagnitude < 0.04f) return;
 
-            if (desired.sqrMagnitude > 0.05f)
+            // «ходьба» — это импульсы в таз и корпус, а не телепорт: рагдолл остаётся физикой
+            var dir = new Vector3(desired.x, 0f, 0f).normalized;
+            foreach (var limb in _limbs)
             {
-                var dir = new Vector3(desired.x, 0f, desired.z).normalized;
-                float moveSpeed = CurrentBehaviour is Behaviour.Flee or Behaviour.Panic ? Speed * 1.8f : Speed;
-                if (IsBurning) moveSpeed *= 1.5f;
-                var v = _rb.velocity;
-                _rb.velocity = new Vector3(dir.x * moveSpeed, v.y, dir.z * moveSpeed);
-                if (dir.sqrMagnitude > 0.01f)
-                    transform.rotation = Quaternion.Slerp(transform.rotation, Quaternion.LookRotation(dir), 0.25f);
-            }
-            else
-            {
-                var v = _rb.velocity;
-                _rb.velocity = new Vector3(v.x * 0.6f, v.y, v.z * 0.6f);
+                if (limb.part == null || limb.part.Body == null) continue;
+                if (limb.name is "LegL" or "LegR" or "Hips")
+                    limb.part.Body.AddForce(dir * 22f, ForceMode.Force);
             }
         }
 
-        Vector3? NearestTarget()
+        Vector3 NearestHazard()
         {
-            Vector3? best = null;
-            float bestDist = 28f;
-            if (_world == null) return null;
+            Vector3 best = transform.position + Vector3.right * 5f;
+            float bestDist = 30f;
+            if (_world == null) return best;
             foreach (var o in _world.Objects)
             {
-                if (o == null) continue;
-                float d = Vector3.Distance(transform.position, o.transform.position);
+                if (o == null || !o.IsBurning) continue;
+                float d = Vector2.Distance(o.transform.position, transform.position);
                 if (d < bestDist) { bestDist = d; best = o.transform.position; }
             }
             return best;
@@ -265,14 +240,44 @@ namespace Elementa
         {
             if (IsDead || amount <= 0f) return;
             Health -= amount;
-            EffectsSystem.SpawnFluidSplash(transform.position + Vector3.up, new Color(0.6f, 0.08f, 0.08f), 10, 2.4f);
-            if (_rb != null && source.HasValue)
+
+            // попадание отрывает ближайшую конечность, если перегрузка выше её порога
+            if (amount > 18f && _limbs.Count > 2)
             {
-                var dir = (transform.position - source.Value).normalized + Vector3.up * 0.3f;
-                _rb.AddForce(dir * Mathf.Clamp(amount, 1f, 120f), ForceMode.Impulse);
+                Limb pick = null;
+                float bestDist = float.MaxValue;
+                var from = source ?? transform.position + Vector3.right;
+                foreach (var limb in _limbs)
+                {
+                    if (limb.part == null || limb.part.name == "Torso" || limb.part.name == "Head") continue;
+                    float d = Vector2.Distance(limb.part.transform.position, from);
+                    if (d < bestDist && amount > limb.maxImpulse * 26f) { bestDist = d; pick = limb; }
+                }
+                if (pick != null) Detach(pick);
             }
-            if (CurrentBehaviour is Behaviour.Idle or Behaviour.Wander) SetBehaviour(Behaviour.Flee);
+
+            if (source.HasValue)
+            {
+                foreach (var limb in _limbs)
+                    if (limb.part != null && limb.part.Body != null)
+                        limb.part.Body.AddForce((transform.position - source.Value).normalized * Mathf.Clamp(amount, 2f, 140f), ForceMode.Impulse);
+            }
+
+            EffectsSystem.SpawnFluidSplash(transform.position + Vector3.up * 0.6f, new Color(0.6f, 0.08f, 0.08f), 8, 2.2f);
+            if (CurrentBehaviour == Behaviour.Still) SetBehaviour(Behaviour.Panic);
             if (Health <= 0f) Die();
+        }
+
+        /// <summary>Отрывает конечность: сустав разрывается, часть остаётся физическим объектом.</summary>
+        public void Detach(Limb limb)
+        {
+            if (limb?.part == null) return;
+            var joint = limb.part.GetComponent<Joint>();
+            if (joint != null) Destroy(joint);
+            limb.health = 0f;
+            _bleed += 2.2f;
+            EffectsSystem.SpawnFluidSplash(limb.part.transform.position, new Color(0.55f, 0.05f, 0.05f), 14, 3f);
+            Game.I?.UI?.Log("Конечность оторвана: " + limb.name);
         }
 
         public void Ignite()
@@ -280,7 +285,7 @@ namespace Elementa
             if (IsBurning || IsDead) return;
             IsBurning = true;
             _burnTimer = 0f;
-            EffectsSystem.SpawnFire(transform.position, Vector3.one, 1f, transform);
+            EffectsSystem.SpawnFire(transform.position + Vector3.up * 0.7f, Vector3.one * 1.1f, 1f, transform);
             SetBehaviour(Behaviour.Panic);
         }
 
@@ -298,38 +303,62 @@ namespace Elementa
 
         void Die()
         {
-            if (IsDead && _collider == null) return;
+            if (Health <= 0f && _bleed < -100f) return;
             Health = 0f;
+            _bleed = -1000f;
             EffectsSystem.DespawnFireFor(transform);
-            // ragdoll: release rotation, push over
-            if (_collider != null) { Destroy(_collider); _collider = null; }
-            if (_rb != null)
+            foreach (var limb in _limbs)
             {
-                _rb.constraints = RigidbodyConstraints.None;
-                _rb.AddTorque(new Vector3(UnityEngine.Random.Range(-2f, 2f), 0f, UnityEngine.Random.Range(1f, 3f)), ForceMode.Impulse);
-                _rb.drag = 1.2f;
+                var joint = limb.part != null ? limb.part.GetComponent<Joint>() : null;
+                if (joint != null) Destroy(joint);
             }
-            foreach (var id in new[] { "flesh" })
-            {
-                EffectsSystem.SpawnFluidSplash(transform.position + Vector3.up * 0.4f, new Color(0.45f, 0.03f, 0.03f), 45, 3.4f);
-            }
+            EffectsSystem.SpawnFluidSplash(transform.position + Vector3.up * 0.3f, new Color(0.45f, 0.03f, 0.03f), 40, 3.2f);
+            AudioSystem.I?.Play("impact", 0.5f, 0.9f);
             OnDied?.Invoke(this);
         }
 
-        public void Remove() { Destroy(gameObject); }
+        public void Remove() => Destroy(gameObject);
 
         public string StatusText()
         {
+            int attached = 0;
+            foreach (var l in _limbs) if (l.health > 0f) attached++;
             string state = IsDead ? "мёртв" : IsBurning ? "горит" : CurrentBehaviour switch
             {
-                Behaviour.Wander => "патруль",
-                Behaviour.Follow => "следует",
-                Behaviour.Chase => "преследует",
+                Behaviour.Wander => "идёт",
                 Behaviour.Flee => "убегает",
                 Behaviour.Panic => "паника",
-                _ => "ожидает"
+                _ => "стоит"
             };
-            return $"{Kind} | {state} | {Health:F0}/{MaxHealth:F0} HP | {Temperature:F0} K";
+            return $"{Kind} · {state} · {Health:F0}/{MaxHealth:F0} HP · частей {attached}/{_limbs.Count} · {Temperature:F0} K";
+        }
+    }
+
+    /// <summary>Часть тела рагдолла: сама сообщает хозяину о попаданиях.</summary>
+    public class BodyPart : MonoBehaviour
+    {
+        public NpcActor Owner { get; private set; }
+        public Rigidbody Body { get; private set; }
+        string _name;
+
+        public void Init(NpcActor owner, string partName)
+        {
+            Owner = owner;
+            Body = GetComponent<Rigidbody>();
+            _name = partName;
+        }
+
+        void OnCollisionEnter(Collision collision)
+        {
+            float speed = collision.relativeVelocity.magnitude;
+            if (speed < 8f || Owner == null) return;
+            Owner.ApplyDamage((speed - 7f) * Body.mass * 0.9f, collision.GetContact(0).point);
+            Sound();
+        }
+
+        void Sound()
+        {
+            if (UnityEngine.Random.value < 0.35f) AudioSystem.I?.Play("impact", 0.35f, UnityEngine.Random.Range(0.85f, 1.15f));
         }
     }
 }

@@ -43,6 +43,9 @@ namespace Elementa
             _clips["cannon"] = Gunshot(0.35f, 320f);
             _clips["boom"] = Explosion(1.4f);
             _clips["fire"] = NoiseLoop(2f, 0.35f, 2200f);
+            // фоли для рагдоллов: тело, хруст костей, отрыв конечности
+            _clips["impact"] = SoftHit();
+            _clips["thud"] = SoftHit();
             _ambient.clip = _clips["fire"];
 
             AudioListener.volume = 0.9f;
@@ -129,7 +132,12 @@ namespace Elementa
 
         public void Play(string clip, float volume = 1f, float pitch = 1f, Vector3? position = null)
         {
-            if (Muted || !_clips.TryGetValue(clip, out var c) || c == null) return;
+            if (Muted) return;
+            if (!_clips.TryGetValue(clip, out var c) || c == null)
+            {
+                // неизвестный ключ не должен ломать логику: тихо подставляем ближайший фоли
+                if (!_clips.TryGetValue("soft", out c) || c == null) return;
+            }
             _sfx.pitch = pitch;
             _sfx.volume = 0.6f * volume;
             _sfx.PlayOneShot(c);

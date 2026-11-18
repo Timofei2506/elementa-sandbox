@@ -230,10 +230,10 @@ namespace Elementa
                 btn.onClick.AddListener(() =>
                 {
                     var cam = Game.I.CameraRig;
-                    var pos = cam.Focus + new Vector3(UnityEngine.Random.Range(-3f, 3f), 1.4f, UnityEngine.Random.Range(-3f, 3f));
+                    var pos = new Vector3(cam.Focus.x + UnityEngine.Random.Range(-3f, 3f), 1.4f, 0f);
                     var npc = Game.I.World.SpawnNpc(pos, k);
                     npc.SetBehaviour(NpcActor.Behaviour.Wander);
-                    Game.I.World.GetComponent<PlayerController>().SelectTool(ToolId.SpawnNpc);
+                    Game.I.World.GetComponent<PlayerController>().SelectTool(ToolId.Npc);
                     Game.I.UI.Log("Создан NPC: " + NpcName(k));
                 });
             }
@@ -326,7 +326,7 @@ namespace Elementa
                 var btn = UIFactory.Button(_list, ShapeName(s), new Vector2(0f, 34f), () =>
                 {
                     Game.I.World.GetComponent<PlayerController>().SetShape(s);
-                    Game.I.World.GetComponent<PlayerController>().SelectTool(ToolId.SpawnMaterial);
+                    Game.I.World.GetComponent<PlayerController>().SelectTool(ToolId.Spawn);
                     Game.I.UI.Log("Форма: " + ShapeName(s));
                 }, Theme.PanelLight, Theme.FontSmall);
                 btn.gameObject.AddComponent<LayoutElement>().preferredHeight = 34f;
@@ -452,11 +452,9 @@ namespace Elementa
 
         static string BehaviourName(NpcActor.Behaviour b) => b switch
         {
-            NpcActor.Behaviour.Idle => "Ожидание",
-            NpcActor.Behaviour.Wander => "Патруль",
-            NpcActor.Behaviour.Follow => "Следование",
-            NpcActor.Behaviour.Chase => "Преследование",
-            NpcActor.Behaviour.Flee => "Бегство",
+            NpcActor.Behaviour.Still => "Стоит",
+            NpcActor.Behaviour.Wander => "Идёт",
+            NpcActor.Behaviour.Flee => "Убегает",
             NpcActor.Behaviour.Panic => "Паника",
             _ => b.ToString()
         };

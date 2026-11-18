@@ -14,6 +14,14 @@ namespace Elementa.Sim
         Frag,        // fragmentation / shrapnel
         Arrow,       // low velocity
         Laser,       // pure energy, no mass
+        Blunt,       // hammer, bat, crowbar: no penetration, huge impulse
+        Blade,       // knife, sword: cuts and dismembers
+        Pierce,      // spear, pickaxe: deep narrow wound
+        Shock,       // electricity: stun + burns
+        Freeze,      // cryo: chilling, embrittlement
+        Poison,      // toxin delivery
+        Flash,       // flashbang: blinding + concussion
+        Smoke,       // smoke screen, no damage
     }
 
     public enum HitResult
@@ -60,6 +68,14 @@ namespace Elementa.Sim
             ProjectileKind.Frag => 0.35f,
             ProjectileKind.Arrow => 0.5f,
             ProjectileKind.Laser => 1.2f,
+            ProjectileKind.Blunt => 0.05f,
+            ProjectileKind.Blade => 0.7f,
+            ProjectileKind.Pierce => 1.1f,
+            ProjectileKind.Shock => 0.05f,
+            ProjectileKind.Freeze => 0.05f,
+            ProjectileKind.Poison => 0.15f,
+            ProjectileKind.Flash => 0f,
+            ProjectileKind.Smoke => 0f,
             _ => 1f,
         };
     }

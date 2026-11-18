@@ -32,7 +32,7 @@ namespace Elementa
         readonly StringBuilder _log = new StringBuilder();
         float _fpsTimer;
         int _frames;
-        bool _catalogOpen = true;
+        bool _catalogOpen = false;
 
         public static UIRoot Create()
         {
@@ -52,13 +52,15 @@ namespace Elementa
             IsMobileLayout = Game.I != null && Game.I.IsMobile;
             BuildTopBar();
             BuildToolbar();
+            BuildInventory();
             BuildCatalog();
             BuildInfoPanel();
             BuildConsole();
             BuildWeaponHud();
             BuildMobileControls();
-            Log("ELEMENTA запущена. " + Game.I.LoadedMaterials + " материалов, " + Game.I.LoadedSubstances + " веществ, " + Game.I.LoadedReactions + " реакций.");
-            Log("ЛКМ — использовать инструмент, ПКМ — вращать камеру, колесо — зум, WASD — панорама.");
+            Log("ELEMENTA · " + Game.I.LoadedMaterials + " материалов, " + Game.I.LoadedSubstances + " веществ, "
+                + Game.I.LoadedReactions + " реакций, " + Game.I.LoadedWeapons + " единиц оружия.");
+            Log("ЛКМ — применить инструмент · колесо — зум · ПКМ/СКМ — двигать камеру · WASD — панорама.");
             if (IsMobileLayout || Screen.width < 1100) ApplyMobileLayout();
             if (IsMobileLayout) BuildMobileToolStrip();
         }
@@ -86,7 +88,8 @@ namespace Elementa
             AddTopButton(bar, "Сброс", ref x, () => { Game.I.World.ResetWorld(); Log("Мир сброшен."); });
             AddTopButton(bar, "Очистить", ref x, () => { Game.I.World.ClearAll(); Log("Сцена очищена."); });
             AddTopButton(bar, "Гравитация", ref x, () => { var w = Game.I.World; w.SetGravity(!w.GravityEnabled); Log("Гравитация: " + (w.GravityEnabled ? "вкл" : "выкл")); });
-            AddTopButton(bar, "Каталог", ref x, () => ToggleCatalog());
+            AddTopButton(bar, "Инвентарь", ref x, () => ToggleInventory());
+            AddTopButton(bar, "Справочник", ref x, () => ToggleCatalog());
             AddTopButton(bar, "Сохранить", ref x, () =>
             {
                 string path = SaveSystem.Save("quick_" + System.DateTime.Now.ToString("HHmmss"));
@@ -114,15 +117,16 @@ namespace Elementa
             UIFactory.SetAnchors((RectTransform)title.transform, new Vector2(0f, 1f), new Vector2(1f, 1f), new Vector2(0f, -46f), new Vector2(0f, -8f));
             string text =
                 "<b>Мышь</b>\n" +
-                "ЛКМ — применить инструмент · ПКМ + мышь — вращать камеру · колесо — зум\n" +
-                "WASD — панорама · Q/E — поворот · F — центрировать\n\n" +
+                "ЛКМ — применить инструмент · ПКМ/СКМ — двигать сцену · колесо — зум\n" +
+                "WASD / стрелки — панорама · Q/E — зум · F — сбросить вид\n\n" +
                 "<b>Горячие клавиши</b>\n" +
-                "1 Курсор · 2 Материал · 3 Жидкость · 4 Оружие · 5 Огонь\n" +
-                "6 Жар · 7 Молот · 8 NPC · 9 Разрушение · 0 Время\n" +
-                "Space — пауза · R — сброс · Tab — каталог · Enter — перезарядка\n\n" +
+                "1 Рука · 2 Предмет · 3 Жидкость · 4 Оружие · 5 Огонь\n" +
+                "6 Жар · 7 Молот · 8 Персонаж · 9 Гравипушка · 0 Ластик\n" +
+                "Space — пауза · R — сброс · Z/X — оружие · [ ] — размер · Enter — перезарядка\n" +
+                "ПКМ/СКМ — двигать сцену · колесо — зум · F — сбросить вид\n\n" +
                 "<b>Телефон</b>\n" +
-                "Один палец — вращение камеры · два пальца — зум · тап — инструмент\n" +
-                "Нижняя панель — инструменты, каталог, пауза\n\n" +
+                "Один палец — двигать сцену · два пальца — зум · тап — инструмент\n" +
+                "Нижняя полоса — инструменты и инвентарь\n\n" +
                 "<i>Совет: термит + магний даёт расплав стали, белизна + кислота — хлор.</i>";
             var body = UIFactory.Label(panel, text, Theme.FontBody, Theme.Text, TextAnchor.UpperLeft);
             UIFactory.SetAnchors((RectTransform)body.transform, Vector2.zero, Vector2.one, new Vector2(22f, 60f), new Vector2(-22f, -54f));
@@ -143,7 +147,15 @@ namespace Elementa
             x += TopButtonWidth + 5f;
         }
 
-        // ---------------- toolbar ----------------
+        // ---------------- inventory (Melon-style) ----------------
+        void BuildInventory()
+        {
+            InventoryPanel = InventoryPanel.Create(this, Root);
+        }
+
+        public InventoryPanel InventoryPanel { get; private set; }
+
+        // ---------------- toolbar (легаси, скрыт: инструменты теперь в инвентаре) ----------------
         void BuildToolbar()
         {
             var panel = UIFactory.Panel(Root, "Toolbar", Theme.Panel, 14f);
@@ -159,15 +171,15 @@ namespace Elementa
             var tools = new (string, ToolId, string)[]
             {
                 ("Курсор", ToolId.Select, "Выбор и перетаскивание объектов"),
-                ("Материал", ToolId.SpawnMaterial, "Создать объект из материала"),
-                ("Жидкость", ToolId.SpawnFluid, "Налить вещество в контейнер"),
-                ("Оружие", ToolId.Shoot, "Стрельба выбранным оружием"),
-                ("Огонь", ToolId.Ignite, "Поджечь объект"),
+                ("Материал", ToolId.Spawn, "Создать объект из материала"),
+                ("Жидкость", ToolId.Fluid, "Налить вещество в контейнер"),
+                ("Оружие", ToolId.Weapon, "Стрельба выбранным оружием"),
+                ("Огонь", ToolId.Fire, "Поджечь объект"),
                 ("Жар", ToolId.Heat, "Нагреть/охладить объект"),
                 ("Молот", ToolId.Hammer, "Нанести физический удар"),
-                ("НПС", ToolId.SpawnNpc, "Создать персонажа"),
+                ("НПС", ToolId.Npc, "Создать персонажа"),
                 ("Разрушить", ToolId.Delete, "Удалить объект"),
-                ("Время", ToolId.TimeControl, "Замедление времени"),
+                ("Время", ToolId.Grab, "Замедление времени"),
             };
 
             foreach (var (caption, id, tip) in tools)
@@ -179,6 +191,8 @@ namespace Elementa
                 var tipGo = btn.gameObject.AddComponent<SimpleTooltip>();
                 tipGo.Text = tip;
             }
+            // панель инвентаря полностью заменяет этот список
+            panel.gameObject.SetActive(false);
         }
 
         // ---------------- catalog ----------------
@@ -189,6 +203,7 @@ namespace Elementa
             CatalogPanel = panel;
             var catalog = panel.gameObject.AddComponent<CatalogView>();
             catalog.Build(this, panel);
+            panel.gameObject.SetActive(_catalogOpen);
         }
 
         // ---------------- info panel ----------------
@@ -227,11 +242,11 @@ namespace Elementa
             h.childAlignment = TextAnchor.MiddleCenter;
             foreach (var (caption, action) in new (string, Action)[]
             {
-                ("Инструменты", () => ToggleToolbar()),
-                ("Каталог", () => ToggleCatalog()),
-                ("Огонь", () => Game.I.World.GetComponent<PlayerController>().SelectTool(ToolId.Ignite)),
-                ("Оружие", () => Game.I.World.GetComponent<PlayerController>().SelectTool(ToolId.Shoot)),
-                ("Камера", () => Game.I.CameraRig.ResetView()),
+                ("Инвентарь", () => ToggleInventory()),
+                ("Предмет", () => Game.I.World.GetComponent<PlayerController>().SelectTool(ToolId.Spawn)),
+                ("Оружие", () => Game.I.World.GetComponent<PlayerController>().SelectTool(ToolId.Weapon)),
+                ("Огонь", () => Game.I.World.GetComponent<PlayerController>().SelectTool(ToolId.Fire)),
+                ("НПС", () => Game.I.World.GetComponent<PlayerController>().SelectTool(ToolId.Npc)),
                 ("Пауза", () => TogglePause()),
             })
             {
@@ -239,6 +254,12 @@ namespace Elementa
                 b.gameObject.AddComponent<LayoutElement>().preferredWidth = 118f;
             }
             panel.gameObject.SetActive(IsMobileLayout);
+        }
+
+        public void ToggleInventory()
+        {
+            if (InventoryPanel == null) return;
+            InventoryPanel.gameObject.SetActive(!InventoryPanel.gameObject.activeSelf);
         }
 
         public void ToggleCatalog()
@@ -284,10 +305,10 @@ namespace Elementa
             // compact captions so the horizontal sheet fits a phone in portrait
             var shortNames = new System.Collections.Generic.Dictionary<ToolId, string>
             {
-                { ToolId.Select, "Кур" }, { ToolId.SpawnMaterial, "Мат" }, { ToolId.SpawnFluid, "Жид" },
-                { ToolId.Shoot, "Стрел" }, { ToolId.Ignite, "Подж" }, { ToolId.Heat, "Жар" },
-                { ToolId.Hammer, "Мол" }, { ToolId.SpawnNpc, "НПС" }, { ToolId.Delete, "Дел" },
-                { ToolId.TimeControl, "Вр" },
+                { ToolId.Select, "Кур" }, { ToolId.Spawn, "Мат" }, { ToolId.Fluid, "Жид" },
+                { ToolId.Weapon, "Стрел" }, { ToolId.Fire, "Подж" }, { ToolId.Heat, "Жар" },
+                { ToolId.Hammer, "Мол" }, { ToolId.Npc, "НПС" }, { ToolId.Delete, "Дел" },
+                { ToolId.Grab, "Вр" },
             };
             for (int i = 0; i < ToolbarPanel.childCount; i++)
             {
@@ -306,6 +327,9 @@ namespace Elementa
                 var text = child.GetComponentInChildren<Text>();
                 if (text != null && shortNames.TryGetValue(marker.Tool, out var shortName)) text.text = shortName;
             }
+
+            // на телефоне инвентарь занимал бы весь экран — вместо него нижняя полоса
+            if (InventoryPanel != null) InventoryPanel.gameObject.SetActive(false);
 
             // left toolbar is replaced by the icon strip; keep it hidden by default
             UIFactory.SetAnchors(ToolbarPanel, new Vector2(0f, 0f), new Vector2(1f, 0f), new Vector2(12f, 62f), new Vector2(-12f, 118f));
@@ -342,9 +366,9 @@ namespace Elementa
             v.childAlignment = TextAnchor.UpperCenter;
             var icons = new (string, ToolId)[]
             {
-                ("◈", ToolId.Select), ("▣", ToolId.SpawnMaterial), ("◍", ToolId.SpawnFluid),
-                ("➤", ToolId.Shoot), ("✷", ToolId.Ignite), ("♨", ToolId.Heat),
-                ("⚒", ToolId.Hammer), ("☺", ToolId.SpawnNpc), ("✖", ToolId.Delete), ("◷", ToolId.TimeControl),
+                ("◈", ToolId.Select), ("▣", ToolId.Spawn), ("◍", ToolId.Fluid),
+                ("➤", ToolId.Weapon), ("✷", ToolId.Fire), ("♨", ToolId.Heat),
+                ("⚒", ToolId.Hammer), ("☺", ToolId.Npc), ("✖", ToolId.Delete), ("◷", ToolId.Grab),
             };
             foreach (var (icon, tool) in icons)
             {

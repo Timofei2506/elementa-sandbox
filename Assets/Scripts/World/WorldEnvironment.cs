@@ -86,7 +86,7 @@ namespace Elementa
         {
             var go = new GameObject("Sun");
             go.transform.SetParent(parent, false);
-            go.transform.rotation = Quaternion.Euler(48f, 34f, 0f);
+            go.transform.rotation = Quaternion.Euler(38f, -28f, 0f);
             var light = go.AddComponent<Light>();
             light.type = LightType.Directional;
             light.color = new Color(1f, 0.94f, 0.85f);
@@ -110,38 +110,85 @@ namespace Elementa
 
         static void BuildArena(Transform parent)
         {
+            // ---- пол: длинная плита, видимая сбоку (камера ортографическая, смотрит по Z) ----
             var groundGo = new GameObject("Ground");
             groundGo.transform.SetParent(parent, false);
-            groundGo.transform.position = new Vector3(0f, -0.05f, 0f);
-            groundGo.transform.localScale = new Vector3(ArenaHalfSize * 2f, 0.1f, ArenaHalfSize * 2f);
+            groundGo.transform.position = new Vector3(0f, -0.6f, 0f);
+            groundGo.transform.localScale = new Vector3(ArenaHalfSize * 2f, 1.2f, 3f);
             var mf = groundGo.AddComponent<MeshFilter>();
             mf.sharedMesh = RuntimeVisuals.Box;
             var mr = groundGo.AddComponent<MeshRenderer>();
             var tex = RuntimeVisuals.GridTexture(1024, 32, 1.6f);
             tex.anisoLevel = 8;
             var mat = RuntimeVisuals.For(Look.Concrete, Color.white, 0.85f, 0f);
-            var groundMat = new Material(mat) { name = "ELEMENTA_Ground", mainTexture = tex, mainTextureScale = new Vector2(ArenaHalfSize / 4f, ArenaHalfSize / 4f) };
+            var groundMat = new Material(mat)
+            {
+                name = "ELEMENTA_Ground",
+                mainTexture = tex,
+                mainTextureScale = new Vector2(ArenaHalfSize / 3f, 1f)
+            };
             mr.sharedMaterial = groundMat;
             mr.shadowCastingMode = ShadowCastingMode.Off;
-            var bc = groundGo.AddComponent<BoxCollider>();
+            groundGo.AddComponent<BoxCollider>();
             groundGo.layer = LayerMask.NameToLayer("Default");
 
-            // invisible arena walls keep props inside
-            CreateWall(parent, new Vector3(0, 5, ArenaHalfSize), new Vector3(ArenaHalfSize * 2, 10, 1));
-            CreateWall(parent, new Vector3(0, 5, -ArenaHalfSize), new Vector3(ArenaHalfSize * 2, 10, 1));
-            CreateWall(parent, new Vector3(ArenaHalfSize, 5, 0), new Vector3(1, 10, ArenaHalfSize * 2));
-            CreateWall(parent, new Vector3(-ArenaHalfSize, 5, 0), new Vector3(1, 10, ArenaHalfSize * 2));
+            // ---- задник: мягкий градиент, чтобы силуэты читались как в 2D-игре ----
+            var backdrop = new GameObject("Backdrop");
+            backdrop.transform.SetParent(parent, false);
+            backdrop.transform.position = new Vector3(0f, 0f, 6f);
+            backdrop.transform.localScale = new Vector3(ArenaHalfSize * 3f, ArenaHalfSize * 3f, 0.1f);
+            var bmf = backdrop.AddComponent<MeshFilter>();
+            bmf.sharedMesh = RuntimeVisuals.Box;
+            var bmr = backdrop.AddComponent<MeshRenderer>();
+            var btex = BackdropTexture(256, 256);
+            bmr.sharedMaterial = new Material(RuntimeVisuals.For(Look.Concrete, Color.white, 1f, 0f))
+            {
+                name = "ELEMENTA_Backdrop",
+                mainTexture = btex
+            };
+            bmr.shadowCastingMode = ShadowCastingMode.Off;
+            Object.Destroy(bmr.gameObject.GetComponent<Collider>());
+            Object.Destroy(bmr.gameObject.GetComponent<BoxCollider>());
 
-            // decorative floor medallion
-            var ring = GameObject.CreatePrimitive(PrimitiveType.Cylinder);
-            ring.name = "Medallion";
-            ring.transform.SetParent(parent, false);
-            ring.transform.position = new Vector3(0f, 0.01f, 0f);
-            ring.transform.localScale = new Vector3(9f, 0.01f, 9f);
-            Object.Destroy(ring.GetComponent<Collider>());
-            var ringMat = RuntimeVisuals.For(Look.Metal, new Color(0.16f, 0.2f, 0.26f), 0.35f, 0.8f);
-            ring.GetComponent<MeshRenderer>().sharedMaterial = ringMat;
+            // ---- стены арены: слева, справа, сверху. В 2D-виде это границы экрана ----
+            CreateWall(parent, new Vector3(-ArenaHalfSize, 12f, 0f), new Vector3(1f, 40f, 3f));
+            CreateWall(parent, new Vector3(ArenaHalfSize, 12f, 0f), new Vector3(1f, 40f, 3f));
+            CreateWall(parent, new Vector3(0f, 24f, 0f), new Vector3(ArenaHalfSize * 2f, 1f, 3f));
+
             Ground = groundGo.transform;
+        }
+
+        /// <summary>Вертикальный градиент для задника: тёмный низ, чуть светлее к горизонту, с сеткой.</summary>
+        public static Texture2D BackdropTexture(int w, int h)
+        {
+            var tex = new Texture2D(w, h, TextureFormat.RGBA32, false)
+            {
+                name = "ELEMENTA_BackdropTex",
+                wrapMode = TextureWrapMode.Clamp,
+                filterMode = FilterMode.Bilinear
+            };
+            var px = new Color32[w * h];
+            var bottom = new Color(0.055f, 0.062f, 0.080f);
+            var mid = new Color(0.10f, 0.115f, 0.150f);
+            var top = new Color(0.075f, 0.085f, 0.115f);
+            for (int y = 0; y < h; y++)
+            {
+                float v = (float)y / (h - 1);
+                Color c = v < 0.55f ? Color.Lerp(bottom, mid, v / 0.55f) : Color.Lerp(mid, top, (v - 0.55f) / 0.45f);
+                for (int x = 0; x < w; x++)
+                {
+                    float u = (float)x / (w - 1);
+                    // еле заметные вертикальные полосы — глубина без шума
+                    float stripe = Mathf.PerlinNoise(u * 18f, 0.4f) * 0.02f;
+                    // крупная сетка
+                    bool grid = (x % 64 == 0) || (y % 64 == 0);
+                    float g = grid ? 0.012f : 0f;
+                    px[y * w + x] = c + new Color(stripe + g, stripe + g, stripe + g + 0.003f, 0f);
+                }
+            }
+            tex.SetPixels32(px);
+            tex.Apply(false);
+            return tex;
         }
 
         static void CreateWall(Transform parent, Vector3 position, Vector3 size)
