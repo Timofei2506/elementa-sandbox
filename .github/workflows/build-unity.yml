@@ -100,6 +100,8 @@ jobs:
         with:
           cliVersion: v0.1.76
           targetPlatform: ${{ matrix.target }}
+          # имя продукта, а не платформы: на выходе ELEMENTA.exe / ELEMENTA.apk
+          buildName: ELEMENTA
           versioning: Semantic
           allowDirtyBuild: true
 
