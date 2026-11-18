@@ -32,7 +32,13 @@
 3. В Unity: меню **ELEMENTA → 1. Создать главную сцену** (один раз).
 4. Нажми **Play**. Проект собирается полностью в рантайме — никаких битых ссылок в сцене.
 
-### Сборка
+### Сборка в GitHub Actions (облако)
+
+Пуш в `main` → GitHub Actions собирает **Windows `.exe`** и **Android `.apk`**, файлы лежат
+в Artifacts запуска. Нужны 3 секрета: `UNITY_LICENSE`, `UNITY_EMAIL`, `UNITY_PASSWORD`
+(только для билда — тесты работают без них). Полная инструкция: **[docs/CI_BUILD.md](docs/CI_BUILD.md)**.
+
+### Локальная сборка
 
 Подробная инструкция со скриншот-шагами: **[docs/UNITY_SETUP.md](docs/UNITY_SETUP.md)**.
 

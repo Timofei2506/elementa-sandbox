@@ -1,0 +1,139 @@
+name: Build (Unity)
+
+# Собирает Windows (.exe) и Android (.apk) в облаке GitHub Actions.
+# Требуются секреты: UNITY_LICENSE, UNITY_EMAIL, UNITY_PASSWORD
+# (см. docs/CI_BUILD.md — как получить .ulf для Personal-лицензии).
+
+on:
+  push:
+    branches: [ main, master ]
+    paths-ignore: [ '**/*.md', 'docs/**' ]
+  workflow_dispatch:
+    inputs:
+      platforms:
+        description: 'Что собирать'
+        type: choice
+        default: all
+        options: [ all, windows, android ]
+
+concurrency:
+  group: unity-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  license-check:
+    name: Проверка секретов
+    runs-on: ubuntu-latest
+    outputs:
+      ready: ${{ steps.check.outputs.ready }}
+      platforms: ${{ steps.check.outputs.platforms }}
+    steps:
+      - id: check
+        env:
+          LICENSE: ${{ secrets.UNITY_LICENSE }}
+          EMAIL: ${{ secrets.UNITY_EMAIL }}
+          PASSWORD: ${{ secrets.UNITY_PASSWORD }}
+          REQUESTED: ${{ github.event.inputs.platforms || 'all' }}
+        run: |
+          ready=true
+          if [ -z "$LICENSE" ]; then
+            echo "::warning::Секрет UNITY_LICENSE не задан — сборка Unity пропущена. Инструкция: docs/CI_BUILD.md"
+            ready=false
+          fi
+          if [ -z "$EMAIL" ] || [ -z "$PASSWORD" ]; then
+            echo "::warning::Секреты UNITY_EMAIL / UNITY_PASSWORD не заданы — сборка Unity пропущена."
+            ready=false
+          fi
+          echo "ready=$ready" >> "$GITHUB_OUTPUT"
+          echo "platforms=$REQUESTED" >> "$GITHUB_OUTPUT"
+
+  build:
+    name: ${{ matrix.label }}
+    needs: license-check
+    if: needs.license-check.outputs.ready == 'true'
+    runs-on: ubuntu-latest
+    timeout-minutes: 120
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - target: StandaloneWindows64
+            label: Windows (.exe)
+          - target: Android
+            label: Android (.apk)
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          lfs: true
+
+      - name: Отключить платформу по запросу
+        id: gate
+        run: |
+          requested="${{ needs.license-check.outputs.platforms }}"
+          want="${{ matrix.target }}"
+          if [ "$requested" = "all" ]; then echo "run=true" >> "$GITHUB_OUTPUT"
+          elif [ "$requested" = "windows" ] && [ "$want" = "StandaloneWindows64" ]; then echo "run=true" >> "$GITHUB_OUTPUT"
+          elif [ "$requested" = "android" ] && [ "$want" = "Android" ]; then echo "run=true" >> "$GITHUB_OUTPUT"
+          else echo "run=false" >> "$GITHUB_OUTPUT"; fi
+
+      - name: Освободить диск (образ Unity большой)
+        if: steps.gate.outputs.run == 'true'
+        run: |
+          sudo rm -rf /usr/share/dotnet/sdk/*/FSharp /usr/share/swift /opt/ghc /usr/local/lib/android/sdk/ndk \
+                      /usr/local/share/boost "$AGENT_TOOLSDIRECTORY" 2>/dev/null || true
+          df -h /
+
+      - name: Кэш Library
+        if: steps.gate.outputs.run == 'true'
+        uses: actions/cache@v4
+        with:
+          path: Library
+          key: Library-${{ matrix.target }}-${{ hashFiles('Assets/**', 'Packages/**', 'ProjectSettings/**') }}
+          restore-keys: |
+            Library-${{ matrix.target }}-
+            Library-
+
+      - name: Сборка Unity
+        if: steps.gate.outputs.run == 'true'
+        uses: game-ci/unity-builder@v4
+        env:
+          UNITY_LICENSE: ${{ secrets.UNITY_LICENSE }}
+          UNITY_EMAIL: ${{ secrets.UNITY_EMAIL }}
+          UNITY_PASSWORD: ${{ secrets.UNITY_PASSWORD }}
+        with:
+          unityVersion: 6000.0.85f2
+          targetPlatform: ${{ matrix.target }}
+          versioning: Semantic
+          allowDirtyBuild: true
+
+      - name: Загрузить артефакт
+        if: steps.gate.outputs.run == 'true'
+        uses: actions/upload-artifact@v4
+        with:
+          name: ELEMENTA-${{ matrix.target }}
+          path: build/${{ matrix.target }}
+          retention-days: 30
+          if-no-files-found: error
+
+  release:
+    name: Релиз (тег)
+    needs: build
+    if: startsWith(github.ref, 'refs/tags/v')
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+    steps:
+      - uses: actions/download-artifact@v4
+        with:
+          path: artifacts
+      - name: Упаковать
+        run: |
+          cd artifacts
+          for d in */; do
+            name=$(basename "$d")
+            (cd "$d" && zip -qr "../${name}.zip" .)
+          done
+      - uses: softprops/action-gh-release@v2
+        with:
+          files: artifacts/*.zip
+          generate_release_notes: true
