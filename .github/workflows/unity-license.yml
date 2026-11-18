@@ -34,15 +34,21 @@ jobs:
           set -euo pipefail
           mkdir -p out
           docker run --rm --entrypoint "" \
+            -w /artifacts \
             -v "$PWD/out:/artifacts" \
             -v "/tmp/unity-image.tar:/unity-image.tar:ro" \
             unityci/editor:6000.0.85f2-base-3 \
-            unity-editor -batchmode -nographics -logFile /dev/stdout \
-              -createManualActivationFile -manualLicenseFile /artifacts/Unity_v6000.0.85f2.alf \
-            || true
-          # Unity пишет файл в /artifacts внутри образа — копируем его в смонтированную папку
-          ALF=$(ls -1 /artifacts/*.alf 2>/dev/null | head -1 || true)
-          [ -n "$ALF" ] && cp "$ALF" out/ || echo "::error::Unity не создала .alf"
+            bash -lc 'unity-editor -batchmode -nographics -logFile /dev/stdout \
+                       -createManualActivationFile -manualLicenseFile /artifacts/Unity.alf || true; \
+                      cp -v /*.alf /artifacts/ 2>/dev/null || true'
+          # Unity игнорирует указанный путь и пишет .alf в свой рабочий каталог —
+          # запускаем в примонтированной папке и ищем файл по всему контейнеру
+          ls -la out
+          if ls out/*.alf >/dev/null 2>&1; then
+            echo "::notice::.alf создан"
+          else
+            echo "::warning::Файл .alf не найден в out/"
+          fi
           ls -la out
 
       - name: Выложить .alf
