@@ -45,8 +45,14 @@ jobs:
           echo "Логин: $UNITY_EMAIL"
           echo "Длина пароля: ${#UNITY_PASSWORD} символов"
 
+      # Официальный установщик CLI (тот же, что использует game-ci/cli action).
+      # Через action не получается: файл install.sh в action-репозитории теряет
+      # бит выполнения, и шаг падает с «Permission denied» (exit 126).
       - name: Установить game-ci CLI
-        uses: game-ci/cli@v0.1.76
+        run: |
+          curl -fsSL https://raw.githubusercontent.com/game-ci/cli/main/install.sh | GAME_CI_VERSION=v0.1.76 sh
+          echo "$HOME/.game-ci/bin" >> "$GITHUB_PATH"
+          "$HOME/.game-ci/bin/game-ci" --version
 
       - name: Активировать место (personal)
         run: game-ci activate .
