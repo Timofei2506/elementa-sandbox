@@ -1,0 +1,49 @@
+name: Unity license
+
+# Шаг 1: сгенерировать файл активации (.alf) — он нужен один раз, чтобы получить лицензию (.ulf).
+# Шаг 2: проверить, что лицензия из секретов рабочая.
+
+on:
+  workflow_dispatch:
+    inputs:
+      action:
+        description: 'Что сделать'
+        type: choice
+        default: request-file
+        options:
+          - request-file
+          - check-license
+
+jobs:
+  request-file:
+    name: Сгенерировать .alf
+    if: github.event.inputs.action == 'request-file'
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Запросить файл активации Unity
+        uses: game-ci/unity-request-activation-file@v2
+        id: get-alf
+        with:
+          unityVersion: 6000.0.85f2
+      - name: Выложить .alf в артефакты
+        uses: actions/upload-artifact@v4
+        with:
+          name: Unity-Activation-File
+          path: ${{ steps.get-alf.outputs.filePath }}
+          retention-days: 7
+
+  check-license:
+    name: Проверить лицензию
+    if: github.event.inputs.action == 'check-license'
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Активация
+        uses: game-ci/unity-activate@v2
+        env:
+          UNITY_LICENSE: ${{ secrets.UNITY_LICENSE }}
+          UNITY_EMAIL: ${{ secrets.UNITY_EMAIL }}
+          UNITY_PASSWORD: ${{ secrets.UNITY_PASSWORD }}
+      - name: Лицензия рабочая
+        run: echo "Лицензия активирована успешно — можно запускать Build (Unity)."
