@@ -41,9 +41,11 @@ jobs:
           mkdir -p tools/unityref
           curl -sSL -o /tmp/unity.nupkg https://api.nuget.org/v3-flatcontainer/unityengine.modules/2021.3.33/unityengine.modules.2021.3.33.nupkg
           unzip -qo /tmp/unity.nupkg -d /tmp/unity
+          chmod -R u+rwX /tmp/unity
           cp /tmp/unity/lib/netstandard2.0/*.dll tools/unityref/
           curl -sSL -o /tmp/ui.nupkg https://api.nuget.org/v3-flatcontainer/unity3d.unityengine.ui/2018.3.5.1/unity3d.unityengine.ui.2018.3.5.1.nupkg
           unzip -qo /tmp/ui.nupkg -d /tmp/ui
+          chmod -R u+rwX /tmp/ui
           find /tmp/ui -name 'UnityEngine.UI.dll' -exec cp {} tools/unityref/ \;
 
       - name: Компиляция геймплейных скриптов
