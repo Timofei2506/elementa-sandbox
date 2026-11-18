@@ -50,19 +50,31 @@ namespace Elementa
         void Build()
         {
             IsMobileLayout = Game.I != null && Game.I.IsMobile;
-            BuildTopBar();
-            BuildToolbar();
-            BuildInventory();
-            BuildCatalog();
-            BuildInfoPanel();
-            BuildConsole();
-            BuildWeaponHud();
-            BuildMobileControls();
+            // Каждый блок интерфейса собирается отдельно: если один упал, остальные
+            // всё равно появятся, а причина будет видна в диагностике (ErrorOverlay).
+            Safe("TopBar", BuildTopBar);
+            Safe("Toolbar", BuildToolbar);
+            Safe("Inventory", BuildInventory);
+            Safe("Catalog", BuildCatalog);
+            Safe("Info", BuildInfoPanel);
+            Safe("Console", BuildConsole);
+            Safe("WeaponHud", BuildWeaponHud);
+            Safe("MobileControls", BuildMobileControls);
             Log("ELEMENTA · " + Game.I.LoadedMaterials + " материалов, " + Game.I.LoadedSubstances + " веществ, "
                 + Game.I.LoadedReactions + " реакций, " + Game.I.LoadedWeapons + " единиц оружия.");
             Log("ЛКМ — применить инструмент · колесо — зум · ПКМ/СКМ — двигать камеру · WASD — панорама.");
-            if (IsMobileLayout || Screen.width < 1100) ApplyMobileLayout();
-            if (IsMobileLayout) BuildMobileToolStrip();
+            if (IsMobileLayout || Screen.width < 1100) Safe("MobileLayout", ApplyMobileLayout);
+            if (IsMobileLayout) Safe("MobileToolStrip", BuildMobileToolStrip);
+        }
+
+        static void Safe(string name, System.Action action)
+        {
+            try { action(); }
+            catch (System.Exception e)
+            {
+                Debug.LogException(e);
+                ErrorOverlay.Report("UI/" + name + ": " + e.Message);
+            }
         }
 
         // ---------------- top bar ----------------

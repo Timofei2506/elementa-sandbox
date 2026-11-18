@@ -14,10 +14,10 @@ namespace Elementa
         public static void Build(Transform parent)
         {
             RenderSettings.ambientMode = AmbientMode.Trilight;
-            RenderSettings.ambientSkyColor = new Color(0.24f, 0.29f, 0.4f);
-            RenderSettings.ambientEquatorColor = new Color(0.16f, 0.19f, 0.25f);
-            RenderSettings.ambientGroundColor = new Color(0.06f, 0.07f, 0.09f);
-            RenderSettings.fog = true;
+            RenderSettings.ambientSkyColor = new Color(0.36f, 0.42f, 0.55f);
+            RenderSettings.ambientEquatorColor = new Color(0.24f, 0.28f, 0.36f);
+            RenderSettings.ambientGroundColor = new Color(0.12f, 0.13f, 0.16f);
+            RenderSettings.fog = false;
             RenderSettings.fogMode = FogMode.ExponentialSquared;
             RenderSettings.fogDensity = 0.0055f;
             RenderSettings.fogColor = new Color(0.09f, 0.11f, 0.15f);
@@ -90,7 +90,7 @@ namespace Elementa
             var light = go.AddComponent<Light>();
             light.type = LightType.Directional;
             light.color = new Color(1f, 0.94f, 0.85f);
-            light.intensity = 1.25f;
+            light.intensity = 1.45f;
             light.shadows = LightShadows.Soft;
             light.shadowStrength = 0.85f;
             light.shadowBias = 0.02f;
@@ -104,7 +104,7 @@ namespace Elementa
             var fl = fill.AddComponent<Light>();
             fl.type = LightType.Directional;
             fl.color = new Color(0.45f, 0.6f, 1f);
-            fl.intensity = 0.35f;
+            fl.intensity = 0.55f;
             fl.shadows = LightShadows.None;
         }
 
@@ -168,9 +168,9 @@ namespace Elementa
                 filterMode = FilterMode.Bilinear
             };
             var px = new Color32[w * h];
-            var bottom = new Color(0.055f, 0.062f, 0.080f);
-            var mid = new Color(0.10f, 0.115f, 0.150f);
-            var top = new Color(0.075f, 0.085f, 0.115f);
+            var bottom = new Color(0.10f, 0.11f, 0.14f);
+            var mid = new Color(0.17f, 0.19f, 0.24f);
+            var top = new Color(0.12f, 0.13f, 0.17f);
             for (int y = 0; y < h; y++)
             {
                 float v = (float)y / (h - 1);

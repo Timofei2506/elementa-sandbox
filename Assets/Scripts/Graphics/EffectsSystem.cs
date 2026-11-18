@@ -33,7 +33,8 @@ namespace Elementa
 
         static Material MakeParticleMaterial(Texture2D tex, Color color, string shader)
         {
-            var sh = Shader.Find(shader) ?? RuntimeVisuals.Standard;
+            // "Sprites/Default" может быть вырезан из билда — берём свой прозрачный шейдер
+            var sh = RuntimeVisuals.Transparent;
             var m = new Material(sh) { name = "ELEMENTA_Particle", mainTexture = tex, color = color };
             return m;
         }
@@ -158,8 +159,9 @@ namespace Elementa
             go.transform.rotation = Quaternion.LookRotation(flatNormal.sqrMagnitude > 0.001f ? -flatNormal : Vector3.forward);
             go.transform.localScale = Vector3.one * size;
             var mr = go.GetComponent<MeshRenderer>();
-            var mat = new Material(RuntimeVisuals.Standard) { name = "ELEMENTA_Decal" };
+            var mat = new Material(RuntimeVisuals.Transparent) { name = "ELEMENTA_Decal" };
             Color c = tint ?? new Color(0.06f, 0.06f, 0.07f);
+            c.a = 0.55f;
             mat.color = c;
             if (mat.HasProperty("_Glossiness")) mat.SetFloat("_Glossiness", 0.15f);
             mr.sharedMaterial = mat;

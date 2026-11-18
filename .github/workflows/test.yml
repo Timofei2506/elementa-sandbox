@@ -48,10 +48,27 @@ jobs:
           chmod -R u+rwX /tmp/ui
           find /tmp/ui -name 'UnityEngine.UI.dll' -exec cp {} tools/unityref/ \;
 
+      - name: Проверить, что шейдеры лежат в Resources (иначе Unity вырежет их из билда)
+        run: |
+          set -e
+          for f in Assets/Resources/Shaders/ElementaSurface.shader Assets/Resources/Shaders/ElementaAdditive.shader; do
+            test -f "$f" || { echo "::error::Нет файла $f"; exit 1; }
+            grep -q 'Shader "Elementa/' "$f" || { echo "::error::$f без имени Elementa/*"; exit 1; }
+            echo "ok: $f"
+          done
+          # в коде не должно остаться прямых ссылок на вырезаемый Standard
+          hits=$(grep -rn "Shader.Find(\"Standard\")" Assets/Scripts || true)
+          if [ -n "$hits" ]; then
+            echo "::error::Остался Shader.Find(Standard) — он вырезается из билда"
+            echo "$hits"
+            exit 1
+          fi
+          echo "прямых ссылок на Standard нет"
+
       - name: Компиляция геймплейных скриптов
         run: dotnet build tools/compile-check/Elementa.CompileCheck.csproj -p:UnityRefs=$PWD/tools/unityref
 
-      - name: Компиляция геймплея с дефайном Unity 6 (drag / velocity / PhysicMaterial)
+      - name: Компиляция веток под Unity 6 (UNITY_6000_0_OR_NEWER)
         run: |
           python3 - <<'PY'
           src = open("tools/compile-check/Elementa.CompileCheck.csproj").read()
@@ -62,19 +79,6 @@ jobs:
           open("tools/compile-check/Unity6.Check.csproj", "w").write(src)
           PY
           dotnet build tools/compile-check/Unity6.Check.csproj -p:UnityRefs=$PWD/tools/unityref
-
-      - name: Компиляция Editor-скриптов с дефайном Unity 6
-        run: |
-          python3 - <<'PY'
-          src = open("tools/compile-check/Elementa.CompileCheck.csproj").read()
-          src = src.replace("<AssemblyName>Assembly-CSharp</AssemblyName>", "<AssemblyName>Assembly-CSharp-Editor-Unity6</AssemblyName>")
-          src = src.replace('<Compile Include="../../Assets/Scripts/**/*.cs" Exclude="../../Assets/Scripts/Editor/**/*.cs" />',
-                            '<Compile Include="../../Assets/Scripts/**/*.cs" />\n    <Compile Include="../editor-stubs/*.cs" />\n    <Compile Include="../unity6-stubs/*.cs" />')
-          src = src.replace("<DefineConstants>UNITY_STANDALONE;UNITY_2021_3_OR_NEWER</DefineConstants>",
-                            "<DefineConstants>UNITY_STANDALONE;UNITY_EDITOR;UNITY_2021_3_OR_NEWER;UNITY_6000_0_OR_NEWER</DefineConstants>")
-          open("tools/compile-check/EditorUnity6.Check.csproj", "w").write(src)
-          PY
-          dotnet build tools/compile-check/EditorUnity6.Check.csproj -p:UnityRefs=$PWD/tools/unityref
 
       - name: Компиляция Editor-скриптов
         run: |

@@ -22,8 +22,24 @@ namespace Elementa
         static Shader _std, _unlit;
         static Texture2D _white;
 
-        public static Shader Standard => _std ??= Shader.Find("Standard");
-        public static Shader Unlit => _unlit ??= Shader.Find("Unlit/Color");
+        // Свои шейдеры из Resources: встроенный "Standard" Unity вырезает из билда,
+        // если на него нет ссылок из ассетов (материалы-то создаются кодом) — и всё
+        // становится розовым. Resources гарантированно попадает в сборку.
+        static Shader _surface, _transparent, _sprite, _fallback;
+
+        public static Shader Surface =>
+            _surface ??= Resources.Load<Shader>("Shaders/ElementaSurface") ?? Sprite;
+
+        public static Shader Transparent =>
+            _transparent ??= Resources.Load<Shader>("Shaders/ElementaAdditive") ?? Shader.Find("Sprites/Default");
+
+        /// <summary>Шейдер для спрайтов/UI-подобных квадов.</summary>
+        public static Shader Sprite =>
+            _sprite ??= Shader.Find("Sprites/Default") ?? Transparent;
+
+        /// <summary>Обратная совместимость: раньше это был Standard.</summary>
+        public static Shader Standard => Surface;
+        public static Shader Unlit => Transparent;
 
         public static Texture2D White
         {
@@ -42,38 +58,27 @@ namespace Elementa
             string key = $"{look}|{(int)(color.r * 40)}|{(int)(color.g * 40)}|{(int)(color.b * 40)}|{(int)(roughness * 10)}|{(int)(metallic * 10)}|{(int)(emission * 10)}";
             if (_cache.TryGetValue(key, out var cached) && cached != null) return cached;
 
-            var mat = new Material(Standard) { name = "ELEMENTA_" + look };
+            bool transparent = look is Look.Glass or Look.Gas or Look.Liquid;
+            var mat = new Material(transparent ? Transparent : Surface) { name = "ELEMENTA_" + look };
+            if (transparent)
+            {
+                // прозрачные материалы: цвет + альфа, без PBR-свойств
+                Color tint = color;
+                if (look == Look.Glass) tint.a = 0.34f;
+                else if (look == Look.Gas) tint.a = 0.22f;
+                else tint.a = Mathf.Clamp(color.a <= 0f ? 0.9f : color.a, 0.55f, 1f);
+                if (mat.HasProperty("_Color")) mat.color = tint;
+                if (mat.HasProperty("_Fade")) mat.SetFloat("_Fade", tint.a);
+                mat.renderQueue = 3000;
+                _cache[key] = mat;
+                return mat;
+            }
             if (mat.HasProperty("_Color")) mat.color = color;
-            if (mat.HasProperty("_BaseColor")) mat.SetColor("_BaseColor", color);
             if (mat.HasProperty("_Glossiness")) mat.SetFloat("_Glossiness", Mathf.Clamp01(1f - roughness));
             if (mat.HasProperty("_Metallic")) mat.SetFloat("_Metallic", metallic);
 
-            switch (look)
-            {
-                case Look.Glass:
-                    mat.SetOverrideTag("RenderType", "Transparent");
-                    mat.SetFloat("_Mode", 3);
-                    mat.SetInt("_SrcBlend", (int)BlendMode.SrcAlpha);
-                    mat.SetInt("_DstBlend", (int)BlendMode.OneMinusSrcAlpha);
-                    mat.SetInt("_ZWrite", 0);
-                    mat.DisableKeyword("_ALPHATEST_ON");
-                    mat.EnableKeyword("_ALPHABLEND_ON");
-                    mat.renderQueue = 3000;
-                    var gc = color; gc.a = 0.35f;
-                    mat.color = gc;
-                    break;
-                case Look.Emissive:
-                    if (mat.HasProperty("_EmissionColor"))
-                    {
-                        mat.EnableKeyword("_EMISSION");
-                        mat.SetColor("_EmissionColor", color * Mathf.Max(1f, emission * 3f));
-                        mat.globalIlluminationFlags = MaterialGlobalIlluminationFlags.RealtimeEmissive;
-                    }
-                    break;
-                case Look.Liquid:
-                    mat.SetFloat("_Glossiness", 0.95f);
-                    break;
-            }
+            if (emission > 0.01f && mat.HasProperty("_EmissionColor"))
+                mat.SetColor("_EmissionColor", color * Mathf.Max(1f, emission * 3f));
             _cache[key] = mat;
             return mat;
         }
@@ -216,16 +221,16 @@ namespace Elementa
         {
             string key = $"trail{(int)(color.r * 20)}{(int)(color.g * 20)}{(int)(color.b * 20)}";
             if (_trails.TryGetValue(key, out var m) && m != null) return m;
-            var sh = Shader.Find("Sprites/Default") ?? Standard;
+            var sh = Sprite;
             m = new Material(sh) { name = "ELEMENTA_Trail", mainTexture = White, color = color };
             _trails[key] = m;
             return m;
         }
         static readonly Dictionary<string, Material> _trails = new Dictionary<string, Material>();
 
-        public static Material Sprite()
+        public static Material SpriteMaterial()
         {
-            var sh = Shader.Find("Sprites/Default");
+            var sh = Sprite;
             var m = new Material(sh) { name = "ELEMENTA_Sprite", mainTexture = White };
             return m;
         }
