@@ -49,7 +49,7 @@ jobs:
           find /tmp/ui -name 'UnityEngine.UI.dll' -exec cp {} tools/unityref/ \;
 
       - name: Компиляция геймплейных скриптов
-        run: dotnet build tools/compile-check/Elementa.CompileCheck.csproj -p:UnityRefs=tools/unityref
+        run: dotnet build tools/compile-check/Elementa.CompileCheck.csproj -p:UnityRefs=$PWD/tools/unityref
 
       - name: Компиляция Editor-скриптов
         run: |
@@ -62,4 +62,4 @@ jobs:
                             "<DefineConstants>UNITY_STANDALONE;UNITY_EDITOR;UNITY_2021_3_OR_NEWER</DefineConstants>")
           open("tools/compile-check/EditorOnly.Check.csproj", "w").write(src)
           PY
-          dotnet build tools/compile-check/EditorOnly.Check.csproj -p:UnityRefs=tools/unityref
+          dotnet build tools/compile-check/EditorOnly.Check.csproj -p:UnityRefs=$PWD/tools/unityref
