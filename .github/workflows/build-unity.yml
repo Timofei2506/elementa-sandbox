@@ -50,6 +50,9 @@ jobs:
     timeout-minutes: 120
     strategy:
       fail-fast: false
+      # По одному билду за раз: у Personal-лицензии всего одно место,
+      # параллельные джобы подрались бы за него («no seats available»).
+      max-parallel: 1
       matrix:
         include:
           - target: StandaloneWindows64
