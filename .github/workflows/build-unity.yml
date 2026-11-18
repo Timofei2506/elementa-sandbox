@@ -7,6 +7,8 @@ name: Build (Unity)
 on:
   push:
     branches: [ main, master ]
+    # тег v1.0.0 → сборка + GitHub Release с .exe и .apk
+    tags: [ 'v*' ]
     paths-ignore: [ '**/*.md', 'docs/**' ]
   workflow_dispatch:
     inputs:
