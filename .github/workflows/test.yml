@@ -57,7 +57,7 @@ jobs:
           src = open("tools/compile-check/Elementa.CompileCheck.csproj").read()
           src = src.replace("<AssemblyName>Assembly-CSharp</AssemblyName>", "<AssemblyName>Assembly-CSharp-Editor</AssemblyName>")
           src = src.replace('<Compile Include="../../Assets/Scripts/**/*.cs" Exclude="../../Assets/Scripts/Editor/**/*.cs" />',
-                            '<Compile Include="../../Assets/Scripts/**/*.cs" />')
+                            '<Compile Include="../../Assets/Scripts/**/*.cs" />\n    <Compile Include="../editor-stubs/*.cs" />')
           src = src.replace("<DefineConstants>UNITY_STANDALONE;UNITY_2021_3_OR_NEWER</DefineConstants>",
                             "<DefineConstants>UNITY_STANDALONE;UNITY_EDITOR;UNITY_2021_3_OR_NEWER</DefineConstants>")
           open("tools/compile-check/EditorOnly.Check.csproj", "w").write(src)
