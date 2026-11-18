@@ -98,7 +98,13 @@ namespace Elementa
             rb.maxDepenetrationVelocity = 3f;
             // soft materials bounce, rigid ones thud
             rb.drag = Mathf.Lerp(0.02f, 0.3f, mat.elasticity);
+            // Unity 6 переименовала PhysicMaterial в PhysicsMaterial; старый тип
+            // помечен obsolete-ошибкой (CS0619), поэтому выбор по версии движка.
+#if UNITY_6000_0_OR_NEWER
+            var pm = new PhysicsMaterial
+#else
             var pm = new PhysicMaterial
+#endif
             {
                 bounciness = Mathf.Clamp01(mat.elasticity * 0.8f),
                 dynamicFriction = Mathf.Lerp(0.85f, 0.4f, mat.elasticity),

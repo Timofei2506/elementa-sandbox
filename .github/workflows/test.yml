@@ -51,6 +51,18 @@ jobs:
       - name: Компиляция геймплейных скриптов
         run: dotnet build tools/compile-check/Elementa.CompileCheck.csproj -p:UnityRefs=$PWD/tools/unityref
 
+      - name: Компиляция веток под Unity 6 (UNITY_6000_0_OR_NEWER)
+        run: |
+          python3 - <<'PY'
+          src = open("tools/compile-check/Elementa.CompileCheck.csproj").read()
+          src = src.replace("<AssemblyName>Assembly-CSharp</AssemblyName>", "<AssemblyName>Assembly-CSharp-Unity6</AssemblyName>")
+          src = src.replace('<Compile Include="../../Assets/Scripts/**/*.cs" Exclude="../../Assets/Scripts/Editor/**/*.cs" />',
+                            '<Compile Include="../../Assets/Scripts/**/*.cs" Exclude="../../Assets/Scripts/Editor/**/*.cs" />\n    <Compile Include="../unity6-stubs/*.cs" />')
+          src = src.replace("UNITY_2021_3_OR_NEWER</DefineConstants>", "UNITY_2021_3_OR_NEWER;UNITY_6000_0_OR_NEWER</DefineConstants>")
+          open("tools/compile-check/Unity6.Check.csproj", "w").write(src)
+          PY
+          dotnet build tools/compile-check/Unity6.Check.csproj -p:UnityRefs=$PWD/tools/unityref
+
       - name: Компиляция Editor-скриптов
         run: |
           python3 - <<'PY'
