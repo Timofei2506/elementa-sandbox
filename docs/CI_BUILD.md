@@ -69,3 +69,12 @@ GitHub → репозиторий → **Settings → Secrets and variables → A
 
 Unity Hub → **ELEMENTA → 3. Собрать Windows (.exe)** / **4. Собрать Android (.apk)**.
 Секреты для этого не нужны вообще.
+
+## 6. Готовые файлы
+
+* **GitHub Release (рекомендую):** https://github.com/Timofei2506/elementa-sandbox/releases
+  — тег `v0.1.0` содержит `ELEMENTA-StandaloneWindows64.zip` и `ELEMENTA-Android.zip`.
+* **Артефакты последнего запуска:** https://github.com/Timofei2506/elementa-sandbox/actions/workflows/build-unity.yml
+
+Как выпускать новые версии: `git tag v0.1.1 && git push origin v0.1.1` — сборка запустится
+сама и прикрепит архивы к новому релизу.
