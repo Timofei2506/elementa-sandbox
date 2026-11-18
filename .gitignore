@@ -8,7 +8,9 @@
 [Uu]ser[Ss]ettings/
 [Mm]emoryCaptures/
 [Rr]ecordings/
-*.csproj
+# Unity regenerates these at the project root; tooling projects under tools/ are tracked
+/*.csproj
+!/tools/**/*.csproj
 *.unityproj
 *.sln
 *.suo
@@ -33,7 +35,9 @@ crashlytics-build.properties
 # Workspace tooling
 tools/unityref/
 bin/
-bin/
 obj/
 *.dll
-!tools/unityref/**
+tools/compile-check/bin/
+tools/compile-check/obj/
+tools/simtest/bin/
+tools/simtest/obj/

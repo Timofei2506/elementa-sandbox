@@ -1,0 +1,18 @@
+<Project Sdk="Microsoft.NET.Sdk">
+  <PropertyGroup>
+    <TargetFramework>netstandard2.1</TargetFramework>
+    <LangVersion>9.0</LangVersion>
+    <Nullable>disable</Nullable>
+    <EnableDefaultCompileItems>false</EnableDefaultCompileItems>
+    <AssemblyName>Assembly-CSharp</AssemblyName>
+    <DefineConstants>UNITY_STANDALONE;UNITY_2021_3_OR_NEWER</DefineConstants>
+    <NoWarn>CS0649;CS0414;CS0169;CS0067;CS1591;CS0108</NoWarn>
+    <TreatWarningsAsErrors>false</TreatWarningsAsErrors>
+  </PropertyGroup>
+  <ItemGroup>
+    <Compile Include="../../Assets/Scripts/**/*.cs" Exclude="../../Assets/Scripts/Editor/**/*.cs" />
+  </ItemGroup>
+  <ItemGroup>
+    <Reference Include="$(UnityRefs)/*.dll" />
+  </ItemGroup>
+</Project>
