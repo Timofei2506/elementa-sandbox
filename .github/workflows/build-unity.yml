@@ -88,10 +88,14 @@ jobs:
       - name: Добавить своп 12 ГБ
         if: steps.gate.outputs.run == 'true'
         run: |
-          sudo fallocate -l 12G /swapfile || sudo dd if=/dev/zero of=/swapfile bs=1M count=12288
-          sudo chmod 600 /swapfile
-          sudo mkswap /swapfile
-          sudo swapon /swapfile
+          # на образе раннера уже есть /swapfile — берём свой путь
+          SWAP=/mnt/ci-swapfile
+          if swapon --show | grep -q "$SWAP"; then echo "своп уже включён"; free -h; exit 0; fi
+          sudo rm -f "$SWAP"
+          sudo fallocate -l 12G "$SWAP" || sudo dd if=/dev/zero of="$SWAP" bs=1M count=12288
+          sudo chmod 600 "$SWAP"
+          sudo mkswap "$SWAP" >/dev/null
+          sudo swapon "$SWAP"
           free -h
 
       - name: Кэш Library
