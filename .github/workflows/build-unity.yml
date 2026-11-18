@@ -83,15 +83,26 @@ jobs:
                       /usr/local/share/boost "$AGENT_TOOLSDIRECTORY" 2>/dev/null || true
           df -h /
 
+      # IL2CPP-линкер Unity требует больше памяти, чем даёт ubuntu-latest (16 ГБ),
+      # и падает в segfault. Своп снимает эту проблему бесплатно.
+      - name: Добавить своп 12 ГБ
+        if: steps.gate.outputs.run == 'true'
+        run: |
+          sudo fallocate -l 12G /swapfile || sudo dd if=/dev/zero of=/swapfile bs=1M count=12288
+          sudo chmod 600 /swapfile
+          sudo mkswap /swapfile
+          sudo swapon /swapfile
+          free -h
+
       - name: Кэш Library
         if: steps.gate.outputs.run == 'true'
         uses: actions/cache@v4
         with:
           path: Library
-          key: Library-${{ matrix.target }}-${{ hashFiles('Assets/**', 'Packages/**', 'ProjectSettings/**') }}
+          key: Library-v2-${{ matrix.target }}-${{ hashFiles('Assets/**', 'Packages/**', 'ProjectSettings/**') }}
           restore-keys: |
-            Library-${{ matrix.target }}-
-            Library-
+            Library-v2-${{ matrix.target }}-
+            Library-v2-
 
       - name: Сборка Unity
         if: steps.gate.outputs.run == 'true'
