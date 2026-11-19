@@ -39,7 +39,7 @@ namespace Elementa
             foreach (Tab tab in Enum.GetValues(typeof(Tab)))
             {
                 var t = tab;
-                var btn = UIFactory.Button(_tabBar, TabName(tab), new Vector2(60f, 34f), () => SetTab(t), Theme.Card, Theme.FontTiny);
+                var btn = UIFactory.Button(_tabBar, TabName(tab), new Vector2(60f, 34f), () => SetTab(t), Theme.Slot, Theme.FontTiny);
                 btn.gameObject.AddComponent<LayoutElement>().preferredWidth = 62f;
                 _tabButtons.Add(btn.gameObject);
             }
@@ -119,7 +119,7 @@ namespace Elementa
 
         void AddMaterialRow(MaterialDef m)
         {
-            var row = UIFactory.Box(_list, "Mat_" + m.id, new Vector2(0f, 1f), new Vector2(1f, 1f), Vector2.zero, new Vector2(0f, 44f), Theme.Card);
+            var row = UIFactory.Box(_list, "Mat_" + m.id, new Vector2(0f, 1f), new Vector2(1f, 1f), Vector2.zero, new Vector2(0f, 44f), Theme.Slot);
             row.gameObject.AddComponent<LayoutElement>().preferredHeight = 44f;
 
             var swatch = UIFactory.Box(row, "Swatch", new Vector2(0f, 0.5f), new Vector2(0f, 0.5f), new Vector2(8f, -14f), new Vector2(36f, 14f), m.color);
@@ -156,7 +156,7 @@ namespace Elementa
 
         void AddSubstanceRow(SubstanceDef s)
         {
-            var row = UIFactory.Box(_list, "Sub_" + s.id, new Vector2(0f, 1f), new Vector2(1f, 1f), Vector2.zero, new Vector2(0f, 44f), Theme.Card);
+            var row = UIFactory.Box(_list, "Sub_" + s.id, new Vector2(0f, 1f), new Vector2(1f, 1f), Vector2.zero, new Vector2(0f, 44f), Theme.Slot);
             row.gameObject.AddComponent<LayoutElement>().preferredHeight = 44f;
 
             UIFactory.Box(row, "Swatch", new Vector2(0f, 0.5f), new Vector2(0f, 0.5f), new Vector2(8f, -14f), new Vector2(36f, 14f), s.color);
@@ -191,7 +191,7 @@ namespace Elementa
                 AddSectionHeader(CategoryName(group.Key));
                 foreach (var w in group)
                 {
-                    var row = UIFactory.Box(_list, "W_" + w.id, new Vector2(0f, 1f), new Vector2(1f, 1f), Vector2.zero, new Vector2(0f, 44f), Theme.Card);
+                    var row = UIFactory.Box(_list, "W_" + w.id, new Vector2(0f, 1f), new Vector2(1f, 1f), Vector2.zero, new Vector2(0f, 44f), Theme.Slot);
                     row.gameObject.AddComponent<LayoutElement>().preferredHeight = 44f;
                     var st = w.Stats;
                     var name = UIFactory.Label(row, w.nameRu, Theme.FontBody, Theme.Text);
@@ -219,7 +219,7 @@ namespace Elementa
             foreach (NpcActor.NpcKind kind in Enum.GetValues(typeof(NpcActor.NpcKind)))
             {
                 var k = kind;
-                var row = UIFactory.Box(_list, "NPC_" + k, new Vector2(0f, 1f), new Vector2(1f, 1f), Vector2.zero, new Vector2(0f, 44f), Theme.Card);
+                var row = UIFactory.Box(_list, "NPC_" + k, new Vector2(0f, 1f), new Vector2(1f, 1f), Vector2.zero, new Vector2(0f, 44f), Theme.Slot);
                 row.gameObject.AddComponent<LayoutElement>().preferredHeight = 44f;
                 var name = UIFactory.Label(row, NpcName(k), Theme.FontBody, Theme.Text);
                 UIFactory.SetAnchors((RectTransform)name.transform, Vector2.zero, Vector2.one, new Vector2(10f, 18f), new Vector2(-8f, -2f));
@@ -230,10 +230,10 @@ namespace Elementa
                 btn.onClick.AddListener(() =>
                 {
                     var cam = Game.I.CameraRig;
-                    var pos = cam.Focus + new Vector3(UnityEngine.Random.Range(-3f, 3f), 1.4f, UnityEngine.Random.Range(-3f, 3f));
+                    var pos = new Vector3(cam.Focus.x + UnityEngine.Random.Range(-3f, 3f), 1.4f, 0f);
                     var npc = Game.I.World.SpawnNpc(pos, k);
                     npc.SetBehaviour(NpcActor.Behaviour.Wander);
-                    Game.I.World.GetComponent<PlayerController>().SelectTool(ToolId.SpawnNpc);
+                    Game.I.World.GetComponent<PlayerController>().SelectTool(ToolId.Npc);
                     Game.I.UI.Log("Создан NPC: " + NpcName(k));
                 });
             }
@@ -272,7 +272,7 @@ namespace Elementa
             foreach (var scenario in ScenarioLibrary.All())
             {
                 var sc = scenario;
-                var row = UIFactory.Box(_list, "Sc_" + sc.id, new Vector2(0f, 1f), new Vector2(1f, 1f), Vector2.zero, new Vector2(0f, 46f), Theme.Card);
+                var row = UIFactory.Box(_list, "Sc_" + sc.id, new Vector2(0f, 1f), new Vector2(1f, 1f), Vector2.zero, new Vector2(0f, 46f), Theme.Slot);
                 row.gameObject.AddComponent<LayoutElement>().preferredHeight = 46f;
                 var name = UIFactory.Label(row, sc.nameRu, Theme.FontBody, Theme.Text);
                 UIFactory.SetAnchors((RectTransform)name.transform, Vector2.zero, Vector2.one, new Vector2(10f, 18f), new Vector2(-8f, -2f));
@@ -299,7 +299,7 @@ namespace Elementa
             foreach (var name in saves)
             {
                 var n = name;
-                var row = UIFactory.Box(_list, "Save_" + n, new Vector2(0f, 1f), new Vector2(1f, 1f), Vector2.zero, new Vector2(0f, 34f), Theme.Card);
+                var row = UIFactory.Box(_list, "Save_" + n, new Vector2(0f, 1f), new Vector2(1f, 1f), Vector2.zero, new Vector2(0f, 34f), Theme.Slot);
                 row.gameObject.AddComponent<LayoutElement>().preferredHeight = 34f;
                 var label = UIFactory.Label(row, n, Theme.FontSmall, Theme.Text);
                 UIFactory.SetAnchors((RectTransform)label.transform, Vector2.zero, Vector2.one, new Vector2(10f, 0f), new Vector2(-10f, 0f));
@@ -326,7 +326,7 @@ namespace Elementa
                 var btn = UIFactory.Button(_list, ShapeName(s), new Vector2(0f, 34f), () =>
                 {
                     Game.I.World.GetComponent<PlayerController>().SetShape(s);
-                    Game.I.World.GetComponent<PlayerController>().SelectTool(ToolId.SpawnMaterial);
+                    Game.I.World.GetComponent<PlayerController>().SelectTool(ToolId.Spawn);
                     Game.I.UI.Log("Форма: " + ShapeName(s));
                 }, Theme.PanelLight, Theme.FontSmall);
                 btn.gameObject.AddComponent<LayoutElement>().preferredHeight = 34f;
@@ -360,7 +360,7 @@ namespace Elementa
         {
             foreach (var t in _list.GetComponentsInChildren<Image>())
             {
-                if (t.color == Theme.PanelLight) t.color = Theme.Card;
+                if (t.color == Theme.PanelLight) t.color = Theme.Slot;
             }
             var img = row.GetComponent<Image>();
             if (img != null) img.color = Theme.PanelLight;
@@ -452,11 +452,9 @@ namespace Elementa
 
         static string BehaviourName(NpcActor.Behaviour b) => b switch
         {
-            NpcActor.Behaviour.Idle => "Ожидание",
-            NpcActor.Behaviour.Wander => "Патруль",
-            NpcActor.Behaviour.Follow => "Следование",
-            NpcActor.Behaviour.Chase => "Преследование",
-            NpcActor.Behaviour.Flee => "Бегство",
+            NpcActor.Behaviour.Still => "Стоит",
+            NpcActor.Behaviour.Wander => "Идёт",
+            NpcActor.Behaviour.Flee => "Убегает",
             NpcActor.Behaviour.Panic => "Паника",
             _ => b.ToString()
         };

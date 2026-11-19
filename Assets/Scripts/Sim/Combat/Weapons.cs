@@ -19,6 +19,11 @@ namespace Elementa.Sim
         public float magSize = 30f;
 
         public ProjectileStats Stats => ProjectileStats.Make(kind, massGrams, velocity, caliberMM);
+
+        /// <summary>Ближний бой: без снаряда, удар наносится сразу в точке курсора.</summary>
+        public bool IsMelee => kind is ProjectileKind.Blunt or ProjectileKind.Blade or ProjectileKind.Pierce;
+        /// <summary>Метательное: летит медленно, с гравитацией, но остаётся снарядом.</summary>
+        public bool IsThrown => category == "thrown";
         public float DistancePerSecond => velocity;
 
         public static WeaponDef FromJson(Dictionary<string, object> o) => new WeaponDef
@@ -35,6 +40,14 @@ namespace Elementa.Sim
                 "frag" => ProjectileKind.Frag,
                 "arrow" => ProjectileKind.Arrow,
                 "laser" => ProjectileKind.Laser,
+                "blunt" => ProjectileKind.Blunt,
+                "blade" => ProjectileKind.Blade,
+                "pierce" => ProjectileKind.Pierce,
+                "shock" => ProjectileKind.Shock,
+                "freeze" => ProjectileKind.Freeze,
+                "poison" => ProjectileKind.Poison,
+                "flash" => ProjectileKind.Flash,
+                "smoke" => ProjectileKind.Smoke,
                 _ => ProjectileKind.Bullet,
             },
             massGrams = (float)Json.Num(o, "mass", 8),

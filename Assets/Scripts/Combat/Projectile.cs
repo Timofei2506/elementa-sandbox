@@ -23,9 +23,12 @@ namespace Elementa
 
         public static Projectile Launch(Vector3 origin, Vector3 direction, ProjectileStats stats, float spreadDeg = 0f, Transform parent = null)
         {
+            // 2D: снаряд живёт чуть перед плоскостью экрана, чтобы не пересекаться с объектами
+            if (Mathf.Abs(origin.z) < 0.2f) origin.z = -0.15f;
+            var start = origin;
             var go = new GameObject("Projectile_" + stats.kind);
             go.transform.SetParent(parent, false);
-            go.transform.position = origin;
+            go.transform.position = start;
             go.layer = LayerMask.NameToLayer("Projectile");
             var p = go.AddComponent<Projectile>();
             p.Stats = stats;
@@ -39,7 +42,7 @@ namespace Elementa
                 direction = rot * direction;
             }
             p.Velocity = direction.normalized * stats.velocity;
-            p._lastPos = origin;
+            p._lastPos = start;
 
             // visual: small glowing tracer
             var mesh = stats.caliberMM > 20f ? RuntimeVisuals.Sphere : RuntimeVisuals.Capsule;
@@ -78,7 +81,11 @@ namespace Elementa
             _age += dt;
             if (_age > Lifetime) { Destroy(gameObject); return; }
 
-            Velocity += Physics.gravity * GravityScale * dt;
+            // 2D: пуля падает по Y, но не уходит по Z из плоскости
+            var g = Physics.gravity * GravityScale * dt;
+            g.z = 0f;
+            Velocity += g;
+            Velocity.z = Mathf.Clamp(Velocity.z, -2f, 2f) * Mathf.Max(0f, 1f - dt * 6f);
             Vector3 next = _lastPos + Velocity * dt;
             Vector3 dir = next - _lastPos;
             float dist = dir.magnitude;
@@ -96,7 +103,7 @@ namespace Elementa
             }
             transform.position = next;
             if (dist > 0.0001f)
-                transform.rotation = Quaternion.LookRotation(dir / dist);
+                transform.rotation = Quaternion.Euler(0f, 0f, Mathf.Atan2(dir.y, dir.x) * Mathf.Rad2Deg);
             _lastPos = next;
 
             if (_age > 2.5f && Stats.kind == ProjectileKind.Laser) { Destroy(gameObject); return; }

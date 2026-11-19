@@ -22,8 +22,24 @@ namespace Elementa
         static Shader _std, _unlit;
         static Texture2D _white;
 
-        public static Shader Standard => _std ??= Shader.Find("Standard");
-        public static Shader Unlit => _unlit ??= Shader.Find("Unlit/Color");
+        // Свои шейдеры из Resources: встроенный "Standard" Unity вырезает из билда,
+        // если на него нет ссылок из ассетов (материалы-то создаются кодом) — и всё
+        // становится розовым. Resources гарантированно попадает в сборку.
+        static Shader _surface, _transparent, _sprite, _fallback;
+
+        public static Shader Surface =>
+            _surface ??= Resources.Load<Shader>("Shaders/ElementaSurface") ?? Sprite;
+
+        public static Shader Transparent =>
+            _transparent ??= Resources.Load<Shader>("Shaders/ElementaAdditive") ?? Shader.Find("Sprites/Default");
+
+        /// <summary>Шейдер для спрайтов/UI-подобных квадов.</summary>
+        public static Shader Sprite =>
+            _sprite ??= Shader.Find("Sprites/Default") ?? Transparent;
+
+        /// <summary>Обратная совместимость: раньше это был Standard.</summary>
+        public static Shader Standard => Surface;
+        public static Shader Unlit => Transparent;
 
         public static Texture2D White
         {
@@ -42,38 +58,27 @@ namespace Elementa
             string key = $"{look}|{(int)(color.r * 40)}|{(int)(color.g * 40)}|{(int)(color.b * 40)}|{(int)(roughness * 10)}|{(int)(metallic * 10)}|{(int)(emission * 10)}";
             if (_cache.TryGetValue(key, out var cached) && cached != null) return cached;
 
-            var mat = new Material(Standard) { name = "ELEMENTA_" + look };
+            bool transparent = look is Look.Glass or Look.Gas or Look.Liquid;
+            var mat = new Material(transparent ? Transparent : Surface) { name = "ELEMENTA_" + look };
+            if (transparent)
+            {
+                // прозрачные материалы: цвет + альфа, без PBR-свойств
+                Color tint = color;
+                if (look == Look.Glass) tint.a = 0.34f;
+                else if (look == Look.Gas) tint.a = 0.22f;
+                else tint.a = Mathf.Clamp(color.a <= 0f ? 0.9f : color.a, 0.55f, 1f);
+                if (mat.HasProperty("_Color")) mat.color = tint;
+                if (mat.HasProperty("_Fade")) mat.SetFloat("_Fade", tint.a);
+                mat.renderQueue = 3000;
+                _cache[key] = mat;
+                return mat;
+            }
             if (mat.HasProperty("_Color")) mat.color = color;
-            if (mat.HasProperty("_BaseColor")) mat.SetColor("_BaseColor", color);
             if (mat.HasProperty("_Glossiness")) mat.SetFloat("_Glossiness", Mathf.Clamp01(1f - roughness));
             if (mat.HasProperty("_Metallic")) mat.SetFloat("_Metallic", metallic);
 
-            switch (look)
-            {
-                case Look.Glass:
-                    mat.SetOverrideTag("RenderType", "Transparent");
-                    mat.SetFloat("_Mode", 3);
-                    mat.SetInt("_SrcBlend", (int)BlendMode.SrcAlpha);
-                    mat.SetInt("_DstBlend", (int)BlendMode.OneMinusSrcAlpha);
-                    mat.SetInt("_ZWrite", 0);
-                    mat.DisableKeyword("_ALPHATEST_ON");
-                    mat.EnableKeyword("_ALPHABLEND_ON");
-                    mat.renderQueue = 3000;
-                    var gc = color; gc.a = 0.35f;
-                    mat.color = gc;
-                    break;
-                case Look.Emissive:
-                    if (mat.HasProperty("_EmissionColor"))
-                    {
-                        mat.EnableKeyword("_EMISSION");
-                        mat.SetColor("_EmissionColor", color * Mathf.Max(1f, emission * 3f));
-                        mat.globalIlluminationFlags = MaterialGlobalIlluminationFlags.RealtimeEmissive;
-                    }
-                    break;
-                case Look.Liquid:
-                    mat.SetFloat("_Glossiness", 0.95f);
-                    break;
-            }
+            if (emission > 0.01f && mat.HasProperty("_EmissionColor"))
+                mat.SetColor("_EmissionColor", color * Mathf.Max(1f, emission * 3f));
             _cache[key] = mat;
             return mat;
         }
@@ -181,6 +186,125 @@ namespace Elementa
         }
 
         /// <summary>9-sliced rounded rectangle sprite so every panel has soft corners.</summary>
+        static readonly Dictionary<string, Sprite> _ringCache = new Dictionary<string, Sprite>();
+
+        /// <summary>
+        /// Скруглённое КОЛЬЦО (контур толщиной border px, прозрачная середина) — «грань стекла».
+        /// Тянится 9-slice, край остаётся ровным при любом размере панели.
+        /// </summary>
+        public static Sprite Ring(int size = 96, int radius = 18, int border = 2)
+        {
+            string key = $"ring_{size}_{radius}_{border}";
+            if (_ringCache.TryGetValue(key, out var cached) && cached != null) return cached;
+
+            radius = Mathf.Clamp(radius, 2, size / 2 - 1);
+            border = Mathf.Clamp(border, 1, Mathf.Min(8, radius));
+            var tex = new Texture2D(size, size, TextureFormat.RGBA32, false)
+            {
+                name = "ELEMENTA_Ring",
+                wrapMode = TextureWrapMode.Clamp,
+                filterMode = FilterMode.Bilinear
+            };
+            var px = new Color32[size * size];
+            float half = size * 0.5f;
+            for (int y = 0; y < size; y++)
+            {
+                for (int x = 0; x < size; x++)
+                {
+                    // расстояние до скруглённого прямоугольника
+                    float dx = Mathf.Abs(x + 0.5f - half) - (half - radius);
+                    float dy = Mathf.Abs(y + 0.5f - half) - (half - radius);
+                    float outside = Mathf.Sqrt(Mathf.Max(dx, 0f) * Mathf.Max(dx, 0f) + Mathf.Max(dy, 0f) * Mathf.Max(dy, 0f));
+                    float dist = outside + Mathf.Min(Mathf.Max(dx, dy), 0f) - radius;   // <0 внутри
+                    float a = Mathf.Clamp01((0f - dist) / 1.5f) * Mathf.Clamp01((dist + border) / 1.5f);
+                    px[y * size + x] = new Color32(255, 255, 255, (byte)(Mathf.Clamp01(a) * 255f));
+                }
+            }
+            tex.SetPixels32(px);
+            tex.Apply(false);
+            int b = radius + 2;
+            var sp = UnityEngine.Sprite.Create(tex, new Rect(0, 0, size, size), new Vector2(0.5f, 0.5f), 100f, 0,
+                SpriteMeshType.FullRect, new Vector4(b, b, b, b));
+            sp.name = "ELEMENTA_RingSprite";
+            _ringCache[key] = sp;
+            return sp;
+        }
+
+        static Sprite _radialSprite;
+
+        /// <summary>Мягкий радиальный градиент как спрайт — для свечений и «ореолов» за стеклом.</summary>
+        public static Sprite RadialSprite()
+        {
+            if (_radialSprite != null) return _radialSprite;
+            var tex = RadialTexture(128, 2.0f);
+            _radialSprite = UnityEngine.Sprite.Create(tex, new Rect(0, 0, tex.width, tex.height), new Vector2(0.5f, 0.5f), 100f);
+            _radialSprite.name = "ELEMENTA_RadialSprite";
+            return _radialSprite;
+        }
+
+        static Shader _glass;
+        /// <summary>Стеклянный UI-шейдер: размытие фона + скругления из спрайта панели.</summary>
+        public static Shader Glass =>
+            _glass ??= Resources.Load<Shader>("Shaders/ElementaGlass") ?? Shader.Find("Elementa/Glass") ?? Sprite;
+
+        static Sprite _boxSprite, _frameSprite;
+
+
+        /// <summary>Пустой (белый) спрайт: прямоугольники без скруглений — стиль Melon.</summary>
+        public static Sprite BoxSprite
+        {
+            get
+            {
+                if (_boxSprite != null) return _boxSprite;
+                var tex = new Texture2D(4, 4, TextureFormat.RGBA32, false)
+                {
+                    name = "ELEMENTA_Box",
+                    wrapMode = TextureWrapMode.Clamp,
+                    filterMode = FilterMode.Point
+                };
+                var px = new Color32[16];
+                for (int i = 0; i < 16; i++) px[i] = new Color32(255, 255, 255, 255);
+                tex.SetPixels32(px);
+                tex.Apply(false);
+                _boxSprite = UnityEngine.Sprite.Create(tex, new Rect(0, 0, 4, 4), new Vector2(0.5f, 0.5f), 100f, 0, SpriteMeshType.FullRect, new Vector4(1, 1, 1, 1));
+                _boxSprite.name = "ELEMENTA_BoxSprite";
+                return _boxSprite;
+            }
+        }
+
+        /// <summary>
+        /// Рамка толщиной border px: белый контур, прозрачная середина. Тянится 9-slice,
+        /// поэтому из неё получаются жёсткие рамки любого размера — как в Melon Sandbox.
+        /// </summary>
+        public static Sprite Frame(int size = 32, int border = 3)
+        {
+            string key = "frame_" + size + "_" + border;
+            if (_frameCache.TryGetValue(key, out var cached) && cached != null) return cached;
+            border = Mathf.Clamp(border, 1, size / 2 - 1);
+            var tex = new Texture2D(size, size, TextureFormat.RGBA32, false)
+            {
+                name = "ELEMENTA_Frame",
+                wrapMode = TextureWrapMode.Clamp,
+                filterMode = FilterMode.Point
+            };
+            var px = new Color32[size * size];
+            for (int y = 0; y < size; y++)
+                for (int x = 0; x < size; x++)
+                {
+                    bool edge = x < border || y < border || x >= size - border || y >= size - border;
+                    px[y * size + x] = edge ? new Color32(255, 255, 255, 255) : new Color32(255, 255, 255, 0);
+                }
+            tex.SetPixels32(px);
+            tex.Apply(false);
+            var sp = UnityEngine.Sprite.Create(tex, new Rect(0, 0, size, size), new Vector2(0.5f, 0.5f), 100f, 0,
+                SpriteMeshType.FullRect, new Vector4(border, border, border, border));
+            sp.name = "ELEMENTA_FrameSprite";
+            _frameCache[key] = sp;
+            return sp;
+        }
+
+        static readonly Dictionary<string, Sprite> _frameCache = new Dictionary<string, Sprite>();
+
         public static Sprite Rounded(int size = 64, int radius = 18)
         {
             string key = $"r{size}_{radius}";
@@ -216,16 +340,16 @@ namespace Elementa
         {
             string key = $"trail{(int)(color.r * 20)}{(int)(color.g * 20)}{(int)(color.b * 20)}";
             if (_trails.TryGetValue(key, out var m) && m != null) return m;
-            var sh = Shader.Find("Sprites/Default") ?? Standard;
+            var sh = Sprite;
             m = new Material(sh) { name = "ELEMENTA_Trail", mainTexture = White, color = color };
             _trails[key] = m;
             return m;
         }
         static readonly Dictionary<string, Material> _trails = new Dictionary<string, Material>();
 
-        public static Material Sprite()
+        public static Material SpriteMaterial()
         {
-            var sh = Shader.Find("Sprites/Default");
+            var sh = Sprite;
             var m = new Material(sh) { name = "ELEMENTA_Sprite", mainTexture = White };
             return m;
         }

@@ -42,7 +42,8 @@ namespace Elementa
             var go = new GameObject($"Obj_{mat.id}_{shape}");
             go.transform.SetParent(parent, false);
             go.transform.position = position;
-            go.transform.rotation = Quaternion.Euler(0f, rotationDeg, 0f);
+            // 2D: вращение только вокруг Z — объект остаётся в плоскости экрана
+            go.transform.rotation = Quaternion.Euler(0f, 0f, rotationDeg);
             go.layer = LayerMask.NameToLayer("Sandbox");
 
             Mesh mesh = shape switch
@@ -57,23 +58,28 @@ namespace Elementa
             var mr = go.AddComponent<MeshRenderer>();
             mr.sharedMaterial = RuntimeVisuals.ForDef(mat);
 
-            var col = go.AddComponent<Collider>();
+            // Collider абстрактный: AddComponent<Collider>() вернул бы null и следующий
+            // col.material уронил бы всю стартовую сцену. Создаём конкретный тип.
+            Collider col;
             switch (shape)
             {
                 case BodyShape.Sphere:
                     var sc = go.AddComponent<SphereCollider>();
                     sc.radius = 0.5f;
+                    col = sc;
                     break;
                 case BodyShape.Capsule:
                     var cc = go.AddComponent<CapsuleCollider>();
-                    cc.radius = 0.5f; cc.height = 2f; cc.direction = 0;
+                    cc.radius = 0.5f; cc.height = 2f; cc.direction = 1;
+                    col = cc;
                     break;
                 case BodyShape.Cylinder:
-                    var cy = go.AddComponent<CapsuleCollider>(); // stable stand-in for a cylinder
+                    var cy = go.AddComponent<CapsuleCollider>(); // вид сбоку: цилиндр читается как капсула
                     cy.radius = 0.5f; cy.height = 2f; cy.direction = 1;
+                    col = cy;
                     break;
                 default:
-                    go.AddComponent<BoxCollider>();
+                    col = go.AddComponent<BoxCollider>();
                     break;
             }
             // Cylinder/capsule primitives are 2 units tall: scale accordingly.
@@ -83,6 +89,10 @@ namespace Elementa
             go.transform.localScale = scale;
 
             var rb = go.AddComponent<Rigidbody>();
+            // ---- ключевое для 2D-вида: движение только в плоскости X/Y ----
+            rb.constraints = RigidbodyConstraints.FreezePositionZ
+                           | RigidbodyConstraints.FreezeRotationX
+                           | RigidbodyConstraints.FreezeRotationY;
             float volume = shape switch
             {
                 BodyShape.Sphere => 0.5236f * size.x * size.y * size.z,
@@ -91,13 +101,13 @@ namespace Elementa
                 _ => size.x * size.y * size.z,
             };
             rb.mass = Mathf.Max(0.05f, mat.density * volume * 0.001f * 1000f * 0.001f);
-            rb.drag = 0.05f;
-            rb.angularDrag = 0.1f;
+            PhysicsCompat.SetLinearDamping(rb, 0.05f);
+            PhysicsCompat.SetAngularDamping(rb, 0.1f);
             rb.interpolation = RigidbodyInterpolation.Interpolate;
             rb.collisionDetectionMode = CollisionDetectionMode.ContinuousDynamic;
             rb.maxDepenetrationVelocity = 3f;
             // soft materials bounce, rigid ones thud
-            rb.drag = Mathf.Lerp(0.02f, 0.3f, mat.elasticity);
+            PhysicsCompat.SetLinearDamping(rb, Mathf.Lerp(0.02f, 0.3f, mat.elasticity));
             // Unity 6 переименовала PhysicMaterial в PhysicsMaterial; старый тип
             // помечен obsolete-ошибкой (CS0619), поэтому выбор по версии движка.
 #if UNITY_6000_0_OR_NEWER
@@ -110,7 +120,7 @@ namespace Elementa
                 dynamicFriction = Mathf.Lerp(0.85f, 0.4f, mat.elasticity),
                 staticFriction = Mathf.Lerp(0.9f, 0.5f, mat.elasticity),
             };
-            col.material = pm;
+            if (col != null) col.material = pm;
 
             var obj = go.AddComponent<SandboxObject>();
             obj.Material = mat;
@@ -118,11 +128,14 @@ namespace Elementa
             obj._rb = rb;
             obj._renderer = mr;
             obj._baseScale = scale;
+            obj._spawnRotation = rotationDeg;
             obj.MaxHealth = Mathf.Clamp(mat.strength * 0.6f + mat.toughness * 2f, 40f, 900f);
             obj.Health = obj.MaxHealth;
             obj.SpawnTime = Time.time;
             return obj;
         }
+
+        float _spawnRotation;
 
         void Awake()
         {

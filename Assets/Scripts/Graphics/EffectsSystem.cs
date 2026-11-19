@@ -33,7 +33,8 @@ namespace Elementa
 
         static Material MakeParticleMaterial(Texture2D tex, Color color, string shader)
         {
-            var sh = Shader.Find(shader) ?? RuntimeVisuals.Standard;
+            // "Sprites/Default" может быть вырезан из билда — берём свой прозрачный шейдер
+            var sh = RuntimeVisuals.Transparent;
             var m = new Material(sh) { name = "ELEMENTA_Particle", mainTexture = tex, color = color };
             return m;
         }
@@ -113,7 +114,8 @@ namespace Elementa
             if (I == null) return;
             var ps = I.Rent(I._sparkPool, "Sparks");
             ps.transform.position = position;
-            ps.transform.rotation = Quaternion.LookRotation(direction.sqrMagnitude > 0.001f ? direction : Vector3.up);
+            var flatDir = new Vector3(direction.x, direction.y, 0f);
+            ps.transform.rotation = Quaternion.LookRotation(flatDir.sqrMagnitude > 0.001f ? flatDir : Vector3.up);
             var main = ps.main;
             main.startLifetime = new ParticleSystem.MinMaxCurve(0.15f, 0.5f);
             main.startSpeed = new ParticleSystem.MinMaxCurve(speed * 0.4f, speed);
@@ -153,11 +155,13 @@ namespace Elementa
             Destroy(go.GetComponent<Collider>());
             go.transform.SetParent(I._root, false);
             go.transform.position = position + normal * 0.006f;
-            go.transform.rotation = Quaternion.LookRotation(-normal);
+            var flatNormal = new Vector3(normal.x, normal.y, 0f);
+            go.transform.rotation = Quaternion.LookRotation(flatNormal.sqrMagnitude > 0.001f ? -flatNormal : Vector3.forward);
             go.transform.localScale = Vector3.one * size;
             var mr = go.GetComponent<MeshRenderer>();
-            var mat = new Material(RuntimeVisuals.Standard) { name = "ELEMENTA_Decal" };
+            var mat = new Material(RuntimeVisuals.Transparent) { name = "ELEMENTA_Decal" };
             Color c = tint ?? new Color(0.06f, 0.06f, 0.07f);
+            c.a = 0.55f;
             mat.color = c;
             if (mat.HasProperty("_Glossiness")) mat.SetFloat("_Glossiness", 0.15f);
             mr.sharedMaterial = mat;

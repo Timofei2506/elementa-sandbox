@@ -43,6 +43,7 @@ namespace Elementa
             // physics collider on the root
             var cc = go.AddComponent<CapsuleCollider>();
             cc.radius = 0.42f; cc.height = 1.2f;
+            cc.direction = 1; // 2D-вид сбоку: стакан стоит вертикально
 
             // liquid body
             var liq = GameObject.CreatePrimitive(PrimitiveType.Cylinder);
@@ -55,8 +56,12 @@ namespace Elementa
 
             var rb = go.AddComponent<Rigidbody>();
             rb.mass = 2.5f;
-            rb.drag = 0.2f;
-            rb.angularDrag = 0.4f;
+            PhysicsCompat.SetLinearDamping(rb, 0.2f);
+            PhysicsCompat.SetAngularDamping(rb, 0.4f);
+            // плоскость экрана: никакого вылета по Z и никакого «падения набок» из плоскости
+            rb.constraints = RigidbodyConstraints.FreezePositionZ
+                           | RigidbodyConstraints.FreezeRotationX
+                           | RigidbodyConstraints.FreezeRotationY;
             rb.collisionDetectionMode = CollisionDetectionMode.ContinuousDynamic;
 
             var c = go.AddComponent<FluidContainer>();

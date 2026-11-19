@@ -32,16 +32,19 @@ namespace Elementa
         readonly StringBuilder _log = new StringBuilder();
         float _fpsTimer;
         int _frames;
-        bool _catalogOpen = true;
+        bool _catalogOpen = false;
 
         public static UIRoot Create()
         {
-            var go = new GameObject("UI");
+            // ВАЖНО: объект под Canvas обязан сразу иметь RectTransform, иначе
+            // (RectTransform)go.transform ниже падает с InvalidCastException.
+            var go = new GameObject("UI", typeof(RectTransform));
             var canvas = UIFactory.CreateCanvas("ELEMENTA_Canvas", 100);
             go.transform.SetParent(canvas.transform, false);
             var ui = go.AddComponent<UIRoot>();
             ui.Canvas = canvas;
-            ui.Root = (RectTransform)go.transform;
+            ui.Root = go.GetComponent<RectTransform>();
+            if (ui.Root == null) ui.Root = go.AddComponent<RectTransform>();
             UIFactory.SetAnchors(ui.Root, Vector2.zero, Vector2.one, Vector2.zero, Vector2.zero);
             ui.Build();
             return ui;
@@ -50,79 +53,134 @@ namespace Elementa
         void Build()
         {
             IsMobileLayout = Game.I != null && Game.I.IsMobile;
-            BuildTopBar();
-            BuildToolbar();
-            BuildCatalog();
-            BuildInfoPanel();
-            BuildConsole();
-            BuildWeaponHud();
-            BuildMobileControls();
-            Log("ELEMENTA запущена. " + Game.I.LoadedMaterials + " материалов, " + Game.I.LoadedSubstances + " веществ, " + Game.I.LoadedReactions + " реакций.");
-            Log("ЛКМ — использовать инструмент, ПКМ — вращать камеру, колесо — зум, WASD — панорама.");
-            if (IsMobileLayout || Screen.width < 1100) ApplyMobileLayout();
-            if (IsMobileLayout) BuildMobileToolStrip();
+            // Каждый блок интерфейса собирается отдельно: если один упал, остальные
+            // всё равно появятся, а причина будет видна в диагностике (ErrorOverlay).
+            // Стеклянный фон: размытие настоящей сцены + цветные ореолы за панелями.
+            Safe("Glass", () =>
+            {
+                var cam = Game.I?.CameraRig?.Cam;
+                GlassBackdrop.Attach(cam, this);
+                BuildGlassGlows();
+            });
+
+            Safe("TopBar", BuildTopBar);
+            Safe("Toolbar", BuildToolbar);
+            Safe("Inventory", BuildInventory);
+            Safe("Catalog", BuildCatalog);
+            Safe("Info", BuildInfoPanel);
+            Safe("Console", BuildConsole);
+            Safe("WeaponHud", BuildWeaponHud);
+            Safe("MobileControls", BuildMobileControls);
+            Log("ELEMENTA · " + Game.I.LoadedMaterials + " материалов, " + Game.I.LoadedSubstances + " веществ, "
+                + Game.I.LoadedReactions + " реакций, " + Game.I.LoadedWeapons + " единиц оружия.");
+            Log("ЛКМ — применить инструмент · колесо — зум · ПКМ/СКМ — двигать камеру · WASD — панорама.");
+            if (IsMobileLayout || Screen.width < 1100) Safe("MobileLayout", ApplyMobileLayout);
+            if (IsMobileLayout) Safe("MobileToolStrip", BuildMobileToolStrip);
+        }
+
+        /// <summary>Мягкие цветные пятна за панелями: стеклу нужно, что подсвечивать и размывать.</summary>
+        void BuildGlassGlows()
+        {
+            var layer = UIFactory.Box(Root, "GlassGlows", Vector2.zero, Vector2.one, Vector2.zero, Vector2.zero);
+            layer.SetAsFirstSibling();
+            layer.gameObject.AddComponent<Image>().color = new Color(0f, 0f, 0f, 0f);
+            layer.GetComponent<Image>().raycastTarget = false;
+
+            GlassBackdrop.Glow(layer, new Vector2(0.14f, 0.78f), new Vector2(760f, 620f), Theme.GlowCyan);
+            GlassBackdrop.Glow(layer, new Vector2(0.86f, 0.30f), new Vector2(680f, 560f), Theme.GlowViolet);
+            GlassBackdrop.Glow(layer, new Vector2(0.50f, 0.08f), new Vector2(900f, 420f), Theme.GlowPink);
+        }
+
+        static void Safe(string name, System.Action action)
+        {
+            try { action(); }
+            catch (System.Exception e)
+            {
+                Debug.LogException(e);
+                ErrorOverlay.Report("UI/" + name + ": " + e.Message);
+            }
         }
 
         // ---------------- top bar ----------------
         void BuildTopBar()
         {
-            var bar = UIFactory.Box(Root, "TopBar", new Vector2(0f, 1f), new Vector2(1f, 1f), new Vector2(0f, -58f), Vector2.zero, Theme.Bg);
-            var title = UIFactory.Label(bar, "ELEMENTA", Theme.FontTitle, Theme.Accent, TextAnchor.MiddleLeft, FontStyle.Bold);
-            UIFactory.SetAnchors((RectTransform)title.transform, new Vector2(0f, 0f), new Vector2(0f, 1f), new Vector2(22f, 0f), new Vector2(240f, 0f));
-            TopTitle = title;
+            // Чёрная полоса с белой линией снизу: только заголовок, счётчики и кнопки-иконки.
+            var bar = UIFactory.Box(Root, "TopBar", new Vector2(0f, 1f), new Vector2(1f, 1f),
+                new Vector2(10f, -64f), new Vector2(-10f, -10f));
+            UIFactory.Glass(bar, new Color(0.05f, 0.06f, 0.09f, 0.62f), 22f);
+            UIFactory.Bevel(bar, 22f, 1.5f);
+            UIFactory.Sheen(bar, 0.55f, 0.08f, 22f);
 
-            var sub = UIFactory.Label(bar, "физика · химия · оружие", Theme.FontSmall, Theme.TextDim);
-            UIFactory.SetAnchors((RectTransform)sub.transform, new Vector2(0f, 0f), new Vector2(0f, 1f), new Vector2(150f, 0f), new Vector2(420f, 0f));
-            _desktopOnly.Add(sub.gameObject);
+            TopTitle = UIFactory.Label(bar, "ELEMENTA", Theme.FontHeader, Theme.Accent, TextAnchor.MiddleLeft, FontStyle.Bold);
+            UIFactory.SetAnchors((RectTransform)TopTitle.transform, new Vector2(0f, 0f), new Vector2(0f, 1f),
+                new Vector2(14f, 0f), new Vector2(190f, 0f));
 
-            FpsText = UIFactory.Label(bar, "60 FPS", Theme.FontTiny, Theme.TextDim, TextAnchor.MiddleRight);
-            UIFactory.SetAnchors((RectTransform)FpsText.transform, new Vector2(1f, 0f), new Vector2(1f, 1f), new Vector2(-330f, 0f), new Vector2(-250f, 0f));
+            FpsText = UIFactory.Label(bar, "60", Theme.FontSmall, Theme.TextDim, TextAnchor.MiddleRight);
+            UIFactory.SetAnchors((RectTransform)FpsText.transform, new Vector2(1f, 0f), new Vector2(1f, 1f),
+                new Vector2(-150f, 0f), new Vector2(-86f, 0f));
 
-            StatusText = UIFactory.Label(bar, "", Theme.FontTiny, Theme.TextDim, TextAnchor.MiddleRight);
-            UIFactory.SetAnchors((RectTransform)StatusText.transform, new Vector2(1f, 0f), new Vector2(1f, 1f), new Vector2(-250f, 0f), new Vector2(-10f, 0f));
+            StatusText = UIFactory.Label(bar, "", Theme.FontSmall, Theme.TextDim, TextAnchor.MiddleRight);
+            UIFactory.SetAnchors((RectTransform)StatusText.transform, new Vector2(1f, 0f), new Vector2(1f, 1f),
+                new Vector2(-470f, 0f), new Vector2(-158f, 0f));
 
-            float x = 260f;
-            AddTopButton(bar, "Пауза", ref x, () => TogglePause());
-            AddTopButton(bar, "Сброс", ref x, () => { Game.I.World.ResetWorld(); Log("Мир сброшен."); });
-            AddTopButton(bar, "Очистить", ref x, () => { Game.I.World.ClearAll(); Log("Сцена очищена."); });
-            AddTopButton(bar, "Гравитация", ref x, () => { var w = Game.I.World; w.SetGravity(!w.GravityEnabled); Log("Гравитация: " + (w.GravityEnabled ? "вкл" : "выкл")); });
-            AddTopButton(bar, "Каталог", ref x, () => ToggleCatalog());
-            AddTopButton(bar, "Сохранить", ref x, () =>
+            // Кнопки справа: крупные квадратные иконки, как в Melon
+            float x = -10f;
+            void TopIcon(string icon, string tip, Action action)
             {
-                string path = SaveSystem.Save("quick_" + System.DateTime.Now.ToString("HHmmss"));
-                Log(path != null ? "Быстрое сохранение готово" : "Не удалось сохранить");
-            });
-            AddTopButton(bar, "Загрузить", ref x, () =>
+                var btn = UIFactory.IconButton(bar, icon, null, new Vector2(44f, 42f), action, 21);
+                var rt = (RectTransform)btn.transform;
+                rt.anchorMin = new Vector2(1f, 0.5f);
+                rt.anchorMax = new Vector2(1f, 0.5f);
+                rt.anchoredPosition = new Vector2(x - 23f, 0f);
+                x -= 50f;
+                var label = UIFactory.Label(rt, tip, 9, new Color(0.62f, 0.74f, 0.86f, 0.9f), TextAnchor.LowerCenter);
+                UIFactory.SetAnchors((RectTransform)label.transform, new Vector2(0f, 0f), new Vector2(1f, 0f),
+                    new Vector2(0f, 1f), new Vector2(0f, 13f));
+            }
+
+            TopIcon("?", "ПОМОЩЬ", () => ShowHelp());
+            TopIcon("♪", "ЗВУК", () =>
             {
-                var latest = SaveSystem.LatestSave();
-                if (latest == null) Log("Сохранений пока нет");
-                else SaveSystem.Load(latest);
+                var a = AudioSystem.I;
+                if (a == null) return;
+                a.SetMuted(!a.Muted);
+                Log(a.Muted ? "Звук выключен" : "Звук включён");
             });
-            AddTopButton(bar, "Звук", ref x, () => { var a = AudioSystem.I; if (a != null) { a.SetMuted(!a.Muted); Log(a.Muted ? "Звук выключен" : "Звук включён"); } });
-            AddTopButton(bar, "Помощь", ref x, () => ShowHelp());
+            TopIcon("▤", "СПРАВОЧНИК", () => ToggleCatalog());
+            TopIcon("◎", "ГРАВИТАЦИЯ", () =>
+            {
+                var w = Game.I?.World;
+                if (w == null) return;
+                w.SetGravity(!w.GravityEnabled);
+                Log("Гравитация: " + (w.GravityEnabled ? "вкл" : "выкл"));
+            });
+            TopIcon("⌫", "ОЧИСТИТЬ", () => { Game.I?.World?.ClearAll(); Log("Сцена очищена."); });
+            TopIcon("↺", "СБРОС", () => { Game.I?.World?.ResetWorld(); Log("Мир сброшен."); });
+            TopIcon("⏸", "ПАУЗА", () => TogglePause());
         }
 
         /// <summary>Full-screen help overlay listing every control.</summary>
         public void ShowHelp()
         {
             if (_help != null) { Destroy(_help.gameObject); _help = null; return; }
-            var overlay = UIFactory.Box(Root, "Help", Vector2.zero, Vector2.one, Vector2.zero, Vector2.zero, new Color(0f, 0f, 0f, 0.72f));
+            var overlay = UIFactory.Box(Root, "Help", Vector2.zero, Vector2.one, Vector2.zero, Vector2.zero, new Color(0.01f, 0.02f, 0.03f, 0.55f));
             _help = overlay;
-            var panel = UIFactory.Panel(overlay, "HelpPanel", Theme.Panel);
+            var panel = UIFactory.GlassPanel(overlay, "HelpPanel", 26f, new Color(0.06f, 0.08f, 0.11f, 0.80f));
             UIFactory.SetAnchors(panel, new Vector2(0.5f, 0.5f), new Vector2(0.5f, 0.5f), new Vector2(-330f, -260f), new Vector2(330f, 260f));
             var title = UIFactory.Label(panel, "УПРАВЛЕНИЕ", Theme.FontHeader, Theme.Accent, TextAnchor.MiddleCenter, FontStyle.Bold);
             UIFactory.SetAnchors((RectTransform)title.transform, new Vector2(0f, 1f), new Vector2(1f, 1f), new Vector2(0f, -46f), new Vector2(0f, -8f));
             string text =
                 "<b>Мышь</b>\n" +
-                "ЛКМ — применить инструмент · ПКМ + мышь — вращать камеру · колесо — зум\n" +
-                "WASD — панорама · Q/E — поворот · F — центрировать\n\n" +
+                "ЛКМ — применить инструмент · ПКМ/СКМ — двигать сцену · колесо — зум\n" +
+                "WASD / стрелки — панорама · Q/E — зум · F — сбросить вид\n\n" +
                 "<b>Горячие клавиши</b>\n" +
-                "1 Курсор · 2 Материал · 3 Жидкость · 4 Оружие · 5 Огонь\n" +
-                "6 Жар · 7 Молот · 8 NPC · 9 Разрушение · 0 Время\n" +
-                "Space — пауза · R — сброс · Tab — каталог · Enter — перезарядка\n\n" +
+                "1 Рука · 2 Предмет · 3 Жидкость · 4 Оружие · 5 Огонь\n" +
+                "6 Жар · 7 Молот · 8 Персонаж · 9 Гравипушка · 0 Ластик\n" +
+                "Space — пауза · R — сброс · Z/X — оружие · [ ] — размер · Enter — перезарядка\n" +
+                "ПКМ/СКМ — двигать сцену · колесо — зум · F — сбросить вид\n\n" +
                 "<b>Телефон</b>\n" +
-                "Один палец — вращение камеры · два пальца — зум · тап — инструмент\n" +
-                "Нижняя панель — инструменты, каталог, пауза\n\n" +
+                "Один палец — двигать сцену · два пальца — зум · тап — инструмент\n" +
+                "Нижняя полоса — инструменты и инвентарь\n\n" +
                 "<i>Совет: термит + магний даёт расплав стали, белизна + кислота — хлор.</i>";
             var body = UIFactory.Label(panel, text, Theme.FontBody, Theme.Text, TextAnchor.UpperLeft);
             UIFactory.SetAnchors((RectTransform)body.transform, Vector2.zero, Vector2.one, new Vector2(22f, 60f), new Vector2(-22f, -54f));
@@ -143,118 +201,135 @@ namespace Elementa
             x += TopButtonWidth + 5f;
         }
 
-        // ---------------- toolbar ----------------
+        // ---------------- inventory (Melon-style) ----------------
+        void BuildInventory()
+        {
+            InventoryPanel = InventoryPanel.Create(this, Root);
+        }
+
+        public InventoryPanel InventoryPanel { get; private set; }
+
+        /// <summary>Легаси-колонка инструментов: заменена панелью инвентаря, оставлена скрытой.</summary>
         void BuildToolbar()
         {
-            var panel = UIFactory.Panel(Root, "Toolbar", Theme.Panel, 14f);
+            var panel = UIFactory.SteelPanel(Root, "Toolbar", 2f);
             UIFactory.SetAnchors(panel, new Vector2(0f, 0.5f), new Vector2(0f, 0.5f), new Vector2(14f, -250f), new Vector2(96f, 250f));
             ToolbarPanel = panel;
-
-            var v = UIFactory.VLayout(panel, 6f, new RectOffset(6, 6, 10, 10));
-            v.childAlignment = TextAnchor.UpperCenter;
-
-            var header = UIFactory.Label(panel, "ИНСТРУМЕНТ", Theme.FontTiny, Theme.TextDim, TextAnchor.MiddleCenter);
-            header.gameObject.AddComponent<LayoutElement>().preferredHeight = 18f;
-
-            var tools = new (string, ToolId, string)[]
-            {
-                ("Курсор", ToolId.Select, "Выбор и перетаскивание объектов"),
-                ("Материал", ToolId.SpawnMaterial, "Создать объект из материала"),
-                ("Жидкость", ToolId.SpawnFluid, "Налить вещество в контейнер"),
-                ("Оружие", ToolId.Shoot, "Стрельба выбранным оружием"),
-                ("Огонь", ToolId.Ignite, "Поджечь объект"),
-                ("Жар", ToolId.Heat, "Нагреть/охладить объект"),
-                ("Молот", ToolId.Hammer, "Нанести физический удар"),
-                ("НПС", ToolId.SpawnNpc, "Создать персонажа"),
-                ("Разрушить", ToolId.Delete, "Удалить объект"),
-                ("Время", ToolId.TimeControl, "Замедление времени"),
-            };
-
-            foreach (var (caption, id, tip) in tools)
-            {
-                var btn = UIFactory.Button(panel, caption, new Vector2(74f, 40f), () => Game.I.World.GetComponent<PlayerController>().SelectTool(id), Theme.Card, Theme.FontSmall);
-                var le = btn.gameObject.AddComponent<LayoutElement>();
-                le.preferredHeight = 40f;
-                btn.gameObject.AddComponent<ToolButtonMarker>().Tool = id;
-                var tipGo = btn.gameObject.AddComponent<SimpleTooltip>();
-                tipGo.Text = tip;
-            }
+            panel.gameObject.SetActive(false);
         }
 
         // ---------------- catalog ----------------
         void BuildCatalog()
         {
-            var panel = UIFactory.Panel(Root, "Catalog", Theme.Panel, 14f);
-            UIFactory.SetAnchors(panel, new Vector2(1f, 0f), new Vector2(1f, 1f), new Vector2(-360f, 62f), new Vector2(-14f, -70f));
+            var panel = UIFactory.SteelPanel(Root, "Catalog", 2f);
+            UIFactory.SetAnchors(panel, new Vector2(1f, 0f), new Vector2(1f, 1f), new Vector2(-378f, 120f), new Vector2(-10f, -66f));
             CatalogPanel = panel;
             var catalog = panel.gameObject.AddComponent<CatalogView>();
             catalog.Build(this, panel);
+            panel.gameObject.SetActive(_catalogOpen);
         }
 
-        // ---------------- info panel ----------------
+        // ---------------- info panel: карточка выбранного объекта ----------------
         void BuildInfoPanel()
         {
-            var panel = UIFactory.Panel(Root, "Info", Theme.Panel, 12f);
-            UIFactory.SetAnchors(panel, new Vector2(0f, 0f), new Vector2(0f, 0f), new Vector2(14f, 62f), new Vector2(420f, 190f));
+            var panel = UIFactory.SteelPanel(Root, "Info", 2f);
+            UIFactory.SetAnchors(panel, new Vector2(0f, 0f), new Vector2(0f, 0f), new Vector2(10f, 108f), new Vector2(430f, 232f));
             InfoPanel = panel;
-            var label = UIFactory.Label(panel, "Ничего не выбрано.\nНаведите курсор и нажмите ЛКМ", Theme.FontSmall, Theme.TextDim, TextAnchor.UpperLeft);
-            UIFactory.SetAnchors((RectTransform)label.transform, Vector2.zero, Vector2.one, new Vector2(12f, 10f), new Vector2(-10f, -8f));
+
+            var cap = UIFactory.Label(panel, "ВЫБРАННЫЙ ОБЪЕКТ", Theme.FontTiny, Theme.Accent, TextAnchor.UpperLeft);
+            UIFactory.SetAnchors((RectTransform)cap.transform, new Vector2(0f, 1f), new Vector2(1f, 1f),
+                new Vector2(10f, -24f), new Vector2(-10f, -4f));
+
+            var label = UIFactory.Label(panel, "Ничего не выбрано.\nНаведите курсор на объект.", Theme.FontSmall, Theme.TextDim, TextAnchor.UpperLeft);
+            UIFactory.SetAnchors((RectTransform)label.transform, new Vector2(0f, 0f), new Vector2(1f, 1f),
+                new Vector2(10f, 8f), new Vector2(-10f, -28f));
             SelectionText = label;
         }
 
+        // ---------------- консоль событий: нижняя треть экрана ----------------
         void BuildConsole()
         {
-            var panel = UIFactory.Panel(Root, "Console", Theme.Bg, 12f);
-            UIFactory.SetAnchors(panel, new Vector2(0f, 0f), new Vector2(1f, 0f), new Vector2(432f, 16f), new Vector2(-378f, 130f));
+            var panel = UIFactory.SteelPanel(Root, "Console", 2f, Theme.Bg);
+            UIFactory.SetAnchors(panel, new Vector2(0f, 0f), new Vector2(1f, 0f), new Vector2(440f, 12f), new Vector2(-390f, 108f));
             ConsolePanel = panel;
             ConsoleText = UIFactory.Label(panel, "", Theme.FontSmall, Theme.TextDim, TextAnchor.LowerLeft);
-            UIFactory.SetAnchors((RectTransform)ConsoleText.transform, Vector2.zero, Vector2.one, new Vector2(12f, 8f), new Vector2(-12f, -6f));
+            UIFactory.SetAnchors((RectTransform)ConsoleText.transform, Vector2.zero, Vector2.one,
+                new Vector2(12f, 8f), new Vector2(-12f, -6f));
         }
 
         Text _weaponText;
         void BuildWeaponHud()
         {
-            var panel = UIFactory.Panel(Root, "WeaponHud", Theme.Panel, 12f);
-            UIFactory.SetAnchors(panel, new Vector2(1f, 0f), new Vector2(1f, 0f), new Vector2(-372f, 16f), new Vector2(-14f, 118f));
+            var panel = UIFactory.SteelPanel(Root, "WeaponHud", 2f);
+            UIFactory.SetAnchors(panel, new Vector2(1f, 0f), new Vector2(1f, 0f), new Vector2(-380f, 12f), new Vector2(-10f, 108f));
             _weaponText = UIFactory.Label(panel, "", Theme.FontSmall, Theme.Text, TextAnchor.UpperLeft);
-            UIFactory.SetAnchors((RectTransform)_weaponText.transform, Vector2.zero, Vector2.one, new Vector2(12f, 8f), new Vector2(-10f, -8f));
+            UIFactory.SetAnchors((RectTransform)_weaponText.transform, Vector2.zero, Vector2.one,
+                new Vector2(12f, 8f), new Vector2(-10f, -8f));
         }
 
+        // ---------------- мобильная нижняя полоса ----------------
         void BuildMobileControls()
         {
-            var panel = UIFactory.Box(Root, "MobileBar", new Vector2(0f, 0f), new Vector2(1f, 0f), new Vector2(0f, 0f), new Vector2(0f, 58f), Theme.Bg);
-            var h = UIFactory.HLayout(panel, 8f, new RectOffset(12, 12, 9, 9));
+            var panel = UIFactory.Box(Root, "MobileBar", new Vector2(0f, 0f), new Vector2(1f, 0f), Vector2.zero, new Vector2(0f, 76f));
+            panel.gameObject.AddComponent<Image>().color = Theme.Bg;
+            UIFactory.Frame(panel, 2f);
+            var h = panel.gameObject.AddComponent<HorizontalLayoutGroup>();
+            h.spacing = 4f;
+            h.padding = new RectOffset(6, 6, 6, 6);
+            h.childControlWidth = false;
+            h.childControlHeight = true;
+            h.childForceExpandWidth = false;
+            h.childForceExpandHeight = true;
             h.childAlignment = TextAnchor.MiddleCenter;
-            foreach (var (caption, action) in new (string, Action)[]
+
+            var items = new (string icon, string caption, Action action)[]
             {
-                ("Инструменты", () => ToggleToolbar()),
-                ("Каталог", () => ToggleCatalog()),
-                ("Огонь", () => Game.I.World.GetComponent<PlayerController>().SelectTool(ToolId.Ignite)),
-                ("Оружие", () => Game.I.World.GetComponent<PlayerController>().SelectTool(ToolId.Shoot)),
-                ("Камера", () => Game.I.CameraRig.ResetView()),
-                ("Пауза", () => TogglePause()),
-            })
+                ("▤", "МЕНЮ", () => ToggleInventory()),
+                ("▣", "ПРЕДМЕТ", () => SelectTool(ToolId.Spawn)),
+                ("➤", "ОРУЖИЕ", () => SelectTool(ToolId.Weapon)),
+                ("✷", "ОГОНЬ", () => SelectTool(ToolId.Fire)),
+                ("☺", "ЛЮДИ", () => SelectTool(ToolId.Npc)),
+                ("✥", "РУКА", () => SelectTool(ToolId.Select)),
+                ("⏸", "ПАУЗА", () => TogglePause()),
+            };
+            foreach (var (icon, caption, action) in items)
             {
-                var b = UIFactory.Button(panel, caption, new Vector2(0f, 40f), action, Theme.PanelLight, Theme.FontSmall);
-                b.gameObject.AddComponent<LayoutElement>().preferredWidth = 118f;
+                var a = action;
+                var b = UIFactory.IconButton(panel, icon, caption, new Vector2(74f, 62f), () => a(), 22, 10);
+                b.gameObject.AddComponent<LayoutElement>().preferredWidth = 74f;
             }
             panel.gameObject.SetActive(IsMobileLayout);
+            _mobileBar = panel;
+        }
+        RectTransform _mobileBar;
+
+        static void SelectTool(ToolId id)
+        {
+            var pc = Game.I?.World != null ? Game.I.World.GetComponent<PlayerController>() : null;
+            pc?.SelectTool(id);
+        }
+
+        public void ToggleInventory()
+        {
+            if (InventoryPanel == null) return;
+            InventoryPanel.gameObject.SetActive(!InventoryPanel.gameObject.activeSelf);
         }
 
         public void ToggleCatalog()
         {
             _catalogOpen = !_catalogOpen;
-            CatalogPanel.gameObject.SetActive(_catalogOpen);
+            if (CatalogPanel != null) CatalogPanel.gameObject.SetActive(_catalogOpen);
         }
 
         public void ToggleToolbar()
         {
-            ToolbarPanel.gameObject.SetActive(!ToolbarPanel.gameObject.activeSelf);
+            if (ToolbarPanel != null) ToolbarPanel.gameObject.SetActive(!ToolbarPanel.gameObject.activeSelf);
         }
 
-        void TogglePause()
+        public void TogglePause()
         {
-            var w = Game.I.World;
+            var w = Game.I?.World;
+            if (w == null) return;
             w.TimeScale = w.TimeScale > 0.01f ? 0f : 1f;
             Log(w.TimeScale > 0.01f ? "Симуляция продолжена." : "Симуляция на паузе.");
         }
@@ -274,86 +349,46 @@ namespace Elementa
 
         bool _mobileLayoutApplied;
 
-        /// <summary>Reflows the interface once for small/touch screens.</summary>
+        /// <summary>Раскладка для телефона: инвентарь на весь экран, панели по краям, нижняя полоса.</summary>
         public void ApplyMobileLayout()
         {
             if (_mobileLayoutApplied) return;
             _mobileLayoutApplied = true;
             IsMobileLayout = true;
 
-            // compact captions so the horizontal sheet fits a phone in portrait
-            var shortNames = new System.Collections.Generic.Dictionary<ToolId, string>
+            // инвентарь раскрывается на весь экран — на телефоне иначе он нечитаем
+            if (InventoryPanel != null)
             {
-                { ToolId.Select, "Кур" }, { ToolId.SpawnMaterial, "Мат" }, { ToolId.SpawnFluid, "Жид" },
-                { ToolId.Shoot, "Стрел" }, { ToolId.Ignite, "Подж" }, { ToolId.Heat, "Жар" },
-                { ToolId.Hammer, "Мол" }, { ToolId.SpawnNpc, "НПС" }, { ToolId.Delete, "Дел" },
-                { ToolId.TimeControl, "Вр" },
-            };
-            for (int i = 0; i < ToolbarPanel.childCount; i++)
-            {
-                var child = ToolbarPanel.GetChild(i) as RectTransform;
-                if (child == null) continue;
-                var marker = child.GetComponent<ToolButtonMarker>();
-                var le = child.GetComponent<LayoutElement>();
-                if (le != null) Destroy(le);
-                if (marker == null)
-                {
-                    child.gameObject.SetActive(false);
-                    continue;
-                }
-                child.sizeDelta = new Vector2(54f, 44f);
-                child.anchoredPosition = Vector2.zero;
-                var text = child.GetComponentInChildren<Text>();
-                if (text != null && shortNames.TryGetValue(marker.Tool, out var shortName)) text.text = shortName;
+                var rt = (RectTransform)InventoryPanel.transform;
+                UIFactory.SetAnchors(rt, new Vector2(0f, 0f), new Vector2(1f, 1f), new Vector2(6f, 82f), new Vector2(-6f, -50f));
+                InventoryPanel.gameObject.SetActive(false);
             }
 
-            // left toolbar is replaced by the icon strip; keep it hidden by default
-            UIFactory.SetAnchors(ToolbarPanel, new Vector2(0f, 0f), new Vector2(1f, 0f), new Vector2(12f, 62f), new Vector2(-12f, 118f));
-            ToolbarPanel.gameObject.SetActive(false);
-            var vl = ToolbarPanel.GetComponent<VerticalLayoutGroup>();
-            if (vl != null) Destroy(vl);
-            var h = ToolbarPanel.gameObject.GetComponent<HorizontalLayoutGroup>();
-            if (h == null) h = ToolbarPanel.gameObject.AddComponent<HorizontalLayoutGroup>();
-            h.spacing = 4f;
-            h.padding = new RectOffset(6, 6, 6, 6);
-            h.childAlignment = TextAnchor.MiddleCenter;
-            h.childControlWidth = false;
-            h.childControlHeight = true;
-            h.childForceExpandWidth = false;
-            h.childForceExpandHeight = false;
+            // на телефоне постоянной колонки инструментов нет — её заменяет нижняя полоса
+            if (ToolbarPanel != null) ToolbarPanel.gameObject.SetActive(false);
 
-            // catalog becomes a slide-over sheet occupying most of the screen
-            UIFactory.SetAnchors(CatalogPanel, new Vector2(1f, 0f), new Vector2(1f, 1f), new Vector2(-330f, 122f), new Vector2(-10f, -64f));
+            // справочник — выезжающая панель на весь экран
+            if (CatalogPanel != null)
+            {
+                UIFactory.SetAnchors(CatalogPanel, new Vector2(0f, 0f), new Vector2(1f, 1f), new Vector2(6f, 82f), new Vector2(-6f, -50f));
+                CatalogPanel.gameObject.SetActive(false);
+            }
 
-            // info + console collapse to small strips
-            UIFactory.SetAnchors(InfoPanel, new Vector2(0f, 0f), new Vector2(0f, 0f), new Vector2(10f, 122f), new Vector2(330f, 210f));
+            // карточка объекта и консоль прячутся: на телефоне каждый пиксель на счету
+            if (InfoPanel != null) InfoPanel.gameObject.SetActive(false);
             if (ConsolePanel != null) ConsolePanel.gameObject.SetActive(false);
+
             var weaponHud = Root.Find("WeaponHud") as RectTransform;
             if (weaponHud != null)
-                UIFactory.SetAnchors(weaponHud, new Vector2(1f, 0f), new Vector2(1f, 0f), new Vector2(-330f, 66f), new Vector2(-10f, 160f));
-            CatalogPanel.gameObject.SetActive(false);
+                UIFactory.SetAnchors(weaponHud, new Vector2(1f, 1f), new Vector2(1f, 1f), new Vector2(-300f, -104f), new Vector2(-8f, -56f));
+
+            if (_mobileBar != null) _mobileBar.gameObject.SetActive(true);
         }
 
-        /// <summary>Vertical icon strip for phones: one icon per tool, no text.</summary>
+        /// <summary>Горизонтальная лента инструментов (используется как резервная навигация).</summary>
         void BuildMobileToolStrip()
         {
-            var strip = UIFactory.Box(Root, "MobileToolStrip", new Vector2(0f, 0f), new Vector2(0f, 1f), new Vector2(8f, 190f), new Vector2(64f, -70f));
-            var v = UIFactory.VLayout((RectTransform)strip, 4f, new RectOffset(4, 4, 6, 6));
-            v.childAlignment = TextAnchor.UpperCenter;
-            var icons = new (string, ToolId)[]
-            {
-                ("◈", ToolId.Select), ("▣", ToolId.SpawnMaterial), ("◍", ToolId.SpawnFluid),
-                ("➤", ToolId.Shoot), ("✷", ToolId.Ignite), ("♨", ToolId.Heat),
-                ("⚒", ToolId.Hammer), ("☺", ToolId.SpawnNpc), ("✖", ToolId.Delete), ("◷", ToolId.TimeControl),
-            };
-            foreach (var (icon, tool) in icons)
-            {
-                var t = tool;
-                var btn = UIFactory.Button(strip, icon, new Vector2(48f, 48f), () => Game.I.World.GetComponent<PlayerController>().SelectTool(t), Theme.Card, 22);
-                btn.gameObject.AddComponent<LayoutElement>().preferredHeight = 48f;
-                var marker = btn.gameObject.AddComponent<ToolButtonMarker>();
-                marker.Tool = t;
-            }
+            BuildMobileControls();
         }
 
         void Update()

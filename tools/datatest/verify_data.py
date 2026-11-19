@@ -64,7 +64,8 @@ if not find("kevlar")["hardness"] > find("concrete")["hardness"]:
 
 for w in weapons:
     if w["velocity"] <= 0 or w["mass"] <= 0: errors.append(f"оружие {w['id']}: невалидная масса/скорость")
-    if w["kind"] not in ("bullet", "ap", "incendiary", "explosive", "shaped", "frag", "arrow", "laser"):
+    if w["kind"] not in ("bullet", "ap", "incendiary", "explosive", "shaped", "frag", "arrow", "laser",
+                        "blunt", "blade", "pierce", "shock", "freeze", "poison", "flash", "smoke"):
         errors.append(f"оружие {w['id']}: неизвестный тип {w['kind']}")
 
 print(f"элементов: {len(elements)}, материалов: {len(materials)}, веществ: {len(substances)}, "
